@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "name": "raco-bot",
+  "version": "0.0.1",
+  "description": "A Telegram bot for forwarding notifications published on El Racó",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "zry98",
+  "license": "MIT",
+  "dependencies": {
+    "html-entities": "^2.1.1",
+    "telegraf": "^3.38.0"
+  }
+}

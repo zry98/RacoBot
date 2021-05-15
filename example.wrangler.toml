@@ -1,0 +1,18 @@
+name = "raco-bot"
+type = "webpack"
+account_id = ""
+workers_dev = false
+route = "raco-bot.example.com/*"
+zone_id = ""
+webpack_config = "webpack.config.js"
+kv_namespaces = [
+         { binding = "KV", id = "" }
+]
+
+[vars]
+FIBAPI_REDIRECT_URI = "https://raco-bot.example.com/oauth/"
+FIBAPI_OAUTH_CLIENT_ID = ""
+USER_ID = ""
+
+[triggers]
+crons = ["*/15 * * * *"]
