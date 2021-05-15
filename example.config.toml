@@ -1,0 +1,26 @@
+host = "0.0.0.0"
+port = 443
+
+[log]
+level = "trace"
+
+[tls]
+certificate = "fullchain.pem"
+private_key = "private.key"
+
+[redis]
+address = "/var/run/redis/redis-server.sock"
+db = 0
+
+[fib_api]
+oauth_client_id = ""
+oauth_client_secret = ""
+oauth_redirect_URI = "https://raco-bot.example.com/o/authorize"
+
+[telegram_bot]
+token = ""
+webhook_URL = "https://raco-bot.example.com/bot"
+
+[jobs]
+# BE CAREFUL with the cron expressions
+push_new_notices_cron = "*/15 7-23 * * 1-5"  # runs every 15 minutes during 07:00-23:00 on every weekday
