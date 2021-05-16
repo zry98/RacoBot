@@ -22,7 +22,7 @@ type LoginLinkMessage struct {
 // String formats a LoginLinkMessage to a proper string with a generated Authorization URL ready to be sent by bot
 func (m LoginLinkMessage) String() string {
 	authorizationURL := fibapi.NewAuthorizationURL(m.State)
-	return fmt.Sprintf("<a href=\"%s\">Authorize Racó Bot</a>", authorizationURL)
+	return fmt.Sprintf("<a href=\"%s\">Authorize RacóBot</a>", authorizationURL)
 }
 
 // NoticeMessage represents a FIB API Notice message
@@ -34,9 +34,7 @@ type NoticeMessage struct {
 var supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre"}
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
-func (n NoticeMessage) String() string {
-	var result string
-
+func (n NoticeMessage) String() (result string) {
 	if n.Text != "" {
 		var err error
 		result, err = lolhtml.RewriteString(
@@ -139,8 +137,7 @@ func (n NoticeMessage) String() string {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", n.ID)
 		}
-		result = html.UnescapeString(result) // unescape HTML entities like `&#39;`
-		result = "\n\n" + result
+		result = "\n\n" + html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
 	// TODO: use template
@@ -155,12 +152,17 @@ func (n NoticeMessage) String() string {
 			fileSize := byteCountIEC(attachment.Size)
 			fmt.Fprintf(&sb, "(%s)  <a href=\"%s\">%s</a>\n", fileSize, attachment.RedirectURL(), attachment.Name)
 		}
-		result = fmt.Sprintf("%s\n\n- With %d attachments:\n%s", result, len(n.Attachments), sb.String())
+
+		noun := "attachment"
+		if len(n.Attachments) > 1 {
+			noun += "s"
+		}
+		result = fmt.Sprintf("%s\n\n- With %d %s:\n%s", result, len(n.Attachments), noun, sb.String())
 	}
 	return result
 }
 
-// byteCountIEC returns the human-readable file size of the given bytes
+// byteCountIEC returns the human-readable file size of the given bytes count
 func byteCountIEC(b int64) string {
 	const unit = 1024
 	if b < unit {

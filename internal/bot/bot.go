@@ -66,7 +66,7 @@ func Init(config BotConfig) {
 
 	// on command `/start`, replies a `/login` message
 	b.Handle("/start", func(c tb.Context) (err error) {
-		return c.Send("/login to authorize Racó Bot") // TODO: make it nicer
+		return c.Send("/login to authorize RacóBot") // TODO: make it nicer
 	})
 
 	// on command `/login`, replies a FIB API OAuth authorization link message for the user
