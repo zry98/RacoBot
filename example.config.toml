@@ -3,10 +3,11 @@ port = 443
 
 [log]
 level = "trace"
+# path = "/var/log/RacoBot.log"
 
 [tls]
-certificate = "fullchain.pem"
-private_key = "private.key"
+certificate_path = "fullchain.pem"
+private_key_path = "private.key"
 
 [redis]
 address = "/var/run/redis/redis-server.sock"

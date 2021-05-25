@@ -1,7 +1,10 @@
 package bot
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -13,25 +16,25 @@ import (
 	"RacoBot/pkg/fibapi"
 )
 
-// Update represents a Telegram Bot Update
+// Update represents a Telegram bot Update
 type Update struct {
 	tb.Update
-	// new fields of Bot API v5.1, waiting for telebot to implement them...
+	// new fields of bot API v5.1, waiting for telebot to implement them...
 	MyChatMember struct{} `json:"my_chat_member,omitempty"`
 	ChatMember   struct{} `json:"chat_member,omitempty"`
 }
 
-// HandleUpdate handles a Telegram Bot Update
+// HandleUpdate handles a Telegram bot Update
 func HandleUpdate(u Update) {
 	b.ProcessUpdate(u.Update)
 }
 
-// Bot represents a Telegram Bot
+// Bot represents a Telegram bot
 type Bot struct {
 	tb.Bot
 }
 
-// reply texts
+// predefined reply texts
 const (
 	FIBAPIOAuthAuthorizationExpiredErrorMessage = "Authorization expired, /login again"
 	InternalErrorMessage                        = "Internal Error"
@@ -44,7 +47,7 @@ var (
 	SendSilentMessageOption = &tb.SendOptions{DisableNotification: true}
 )
 
-// BotConfig represents a configuration for Telegram Bot
+// BotConfig represents a configuration for Telegram bot
 type BotConfig struct {
 	Token      string `toml:"token"`
 	WebhookURL string `toml:"webhook_URL"`
@@ -52,7 +55,7 @@ type BotConfig struct {
 
 var b *Bot
 
-// Init initializes the Bot
+// Init initializes the bot
 func Init(config BotConfig) {
 	_b, err := tb.NewBot(tb.Settings{
 		Token:       config.Token,
@@ -183,7 +186,43 @@ func Init(config BotConfig) {
 		return db.PutUserLastNoticeID(userID, lastNoticeID)
 	}))
 
+	err = setWebhook(config.WebhookURL)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
 	log.Info("Bot OK")
+}
+
+func setWebhook(URL string) error {
+	resp, err := http.Get(fmt.Sprintf("https://api.telegram.org/bot%s/setWebhook?url=%s", b.Token, URL))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error setting webhook (HTTP %d)", resp.StatusCode)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var r struct {
+		OK          bool   `json:"ok"`
+		Result      bool   `json:"result,omitempty"`
+		ErrorCode   int    `json:"error_code,omitempty"`
+		Description string `json:"description"`
+	}
+	if err = json.Unmarshal(body, &r); err != nil {
+		return err
+	}
+	if r.OK && r.Result && (r.Description == "Webhook was set" || r.Description == "Webhook is already set") {
+		return nil
+	}
+	return fmt.Errorf("error setting webhook: (code %d) %s", r.ErrorCode, r.Description)
 }
 
 func middleware(next tb.HandlerFunc) tb.HandlerFunc {

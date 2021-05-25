@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"net/http"
 	"time"
@@ -17,7 +18,10 @@ import (
 var config Config
 
 func init() {
-	config = LoadConfig()
+	configPath := flag.String("config", "./config.toml", "Config file path (default: ./config.toml)")
+	flag.Parse()
+	config = LoadConfig(*configPath)
+
 	db.Init(config.Redis)
 	bot.Init(config.TelegramBot)
 	fibapi.Init(config.FIBAPI)
@@ -46,8 +50,8 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	if config.TLS.Certificate != "" && config.TLS.PrivateKey != "" {
-		cert, err := tls.LoadX509KeyPair(config.TLS.Certificate, config.TLS.PrivateKey)
+	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
 		if err != nil {
 			log.Fatal(err)
 			return

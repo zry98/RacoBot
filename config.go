@@ -29,22 +29,21 @@ type Config struct {
 	FIBAPIOAuthRedirectPath string
 }
 
-// LogConfig represents a configuration for logger
+// LogConfig represents a configuration for the global logger
 type LogConfig struct {
 	Level string `toml:"level"`
-	File  string `toml:"file"`
+	Path  string `toml:"path"`
 }
 
 // TLSConfig represents a configuration for TLS of HTTP server
 type TLSConfig struct {
-	Certificate string `toml:"certificate"`
-	PrivateKey  string `toml:"private_key"`
+	CertificatePath string `toml:"certificate_path"`
+	PrivateKeyPath  string `toml:"private_key_path"`
 }
 
 // LoadConfig loads a configuration from the file ./config.toml
-// TODO: implement config file path option
-func LoadConfig() (c Config) {
-	f, err := ioutil.ReadFile("./config.toml")
+func LoadConfig(path string) (c Config) {
+	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -94,8 +93,8 @@ func (c *Config) setupLogger() {
 		log.Info("Log level set to: ", l)
 	}
 
-	if c.Log.File != "" {
-		f, err := os.OpenFile(c.Log.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if c.Log.Path != "" {
+		f, err := os.OpenFile(c.Log.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal("failed to open log file: ", err)
 		}
