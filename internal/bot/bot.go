@@ -59,8 +59,8 @@ var b *Bot
 func Init(config BotConfig) {
 	_b, err := tb.NewBot(tb.Settings{
 		Token:       config.Token,
-		Synchronous: true, // for webhook mode
-		//Verbose:     true, // for debugging only
+		Synchronous: true,                             // for webhook mode
+		Verbose:     log.GetLevel() == log.DebugLevel, // for debugging only
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -69,7 +69,7 @@ func Init(config BotConfig) {
 
 	// on command `/start`, replies a `/login` message
 	b.Handle("/start", func(c tb.Context) (err error) {
-		return c.Send("/login to authorize RacóBot") // TODO: make it nicer
+		return c.Send("/login to authorize Racó Bot") // TODO: make it nicer
 	})
 
 	// on command `/login`, replies a FIB API OAuth authorization link message for the user
@@ -271,8 +271,7 @@ func (bot *Bot) sendMessage(userID int64, message interface{}, opt ...interface{
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) {
-	_, err := b.sendMessage(userID, message, opt...)
-	if err != nil {
+	if _, err := b.sendMessage(userID, message, opt...); err != nil {
 		log.Error(err)
 	}
 }

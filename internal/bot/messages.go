@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"html"
 	"strings"
 
 	"github.com/coolspring8/go-lolhtml"
@@ -29,6 +28,11 @@ func (m LoginLinkMessage) String() string {
 type NoticeMessage struct {
 	fibapi.Notice
 }
+
+const (
+	messageMaxLength      int    = 4096
+	RacoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
+)
 
 // these are the HTML tags Telegram supported
 var supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre"}
@@ -137,11 +141,10 @@ func (n NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", n.ID)
 		}
-		result = "\n\n" + html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
 	// TODO: use template
-	result = fmt.Sprintf("[%s] <b>%s</b>%s",
+	result = fmt.Sprintf("[%s] <b>%s</b>\n\n%s",
 		n.SubjectCode,
 		n.Title,
 		result)
@@ -157,7 +160,14 @@ func (n NoticeMessage) String() (result string) {
 		if len(n.Attachments) > 1 {
 			noun += "s"
 		}
-		result = fmt.Sprintf("%s\n\n- With %d %s:\n%s", result, len(n.Attachments), noun, sb.String())
+		result = fmt.Sprintf("%s\n\n<i>- With %d %s:</i>\n%s", result, len(n.Attachments), noun, sb.String())
+	}
+
+	if len(result) > messageMaxLength { // send Racó notice URL instead if message length exceeds the limit of 4096 characters
+		result = fmt.Sprintf("[%s] <b>%s</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href=\"%s\">this link</a>.",
+			n.SubjectCode,
+			n.Title,
+			fmt.Sprintf(RacoNoticeURLTemplate, n.SubjectCode, n.ID))
 	}
 	return result
 }

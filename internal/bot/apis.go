@@ -64,6 +64,7 @@ func (c *Client) GetFullName() (fullName string, err error) {
 		return
 	}
 	defer c.updateToken()
+
 	res, err := c.Client.GetUserInfo()
 	if err != nil {
 		return
@@ -80,6 +81,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 		return
 	}
 	defer c.updateToken()
+
 	res, err := c.Client.GetNotices()
 	if err != nil {
 		return
@@ -103,6 +105,7 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 		return
 	}
 	defer c.updateToken()
+
 	res, err := c.Client.GetNotice(ID)
 	if err != nil {
 		return
@@ -119,6 +122,7 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 		return
 	}
 	defer c.updateToken()
+
 	res, err := c.GetNotices()
 	if err != nil {
 		return
