@@ -70,7 +70,7 @@ func (c *Client) GetFullName() (fullName string, err error) {
 		return
 	}
 
-	fullName = fmt.Sprintf("%s %s", res.FirstName, res.LastName)
+	fullName = fmt.Sprintf("%s %s", res.FirstName, res.LastNames)
 	return
 }
 

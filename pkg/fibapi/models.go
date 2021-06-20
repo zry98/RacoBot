@@ -12,7 +12,7 @@ import (
 type UserInfo struct {
 	Username  string `json:"username"`
 	FirstName string `json:"nom"`
-	LastName  string `json:"cognoms"`
+	LastNames string `json:"cognoms"`
 }
 
 // Notice represents a single notice in a Notices API response
@@ -38,11 +38,11 @@ type Notices struct {
 type Schedule struct {
 	SubjectCode string `json:"codi_assig"`
 	Group       string `json:"grup"`
-	Weekday     int    `json:"dia_setmana"`
+	DayOfWeek   int    `json:"dia_setmana"`
 	StartTime   string `json:"inici"`
 	Duration    int    `json:"durada"`
-	Type        string `json:"tipus"`
-	Classroom   string `json:"aules"`
+	Types       string `json:"tipus"`
+	Classrooms  string `json:"aules"`
 }
 
 // Schedules represents a user's schedules API response
@@ -74,7 +74,7 @@ type Subjects struct {
 
 // Attachment represents a single attachment in a Notice's attachments
 type Attachment struct {
-	MimeType   string   `json:"tipus_mime"`
+	MimeTypes  string   `json:"tipus_mime"`
 	Name       string   `json:"nom"`
 	URL        string   `json:"url"`
 	ModifiedAt TimeDate `json:"data_modificacio"`

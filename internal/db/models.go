@@ -97,7 +97,7 @@ func PutToken(userID int64, token *oauth2.Token) error {
 }
 
 // GetToken gets the OAuth token of the user with the given ID
-func GetToken(userID int64) (token *oauth2.Token, error error) {
+func GetToken(userID int64) (token *oauth2.Token, err error) {
 	key := fmt.Sprintf("%s:%d", userTokenKeyPrefix, userID)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
