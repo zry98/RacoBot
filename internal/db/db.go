@@ -11,7 +11,7 @@ import (
 
 // RedisConfig represents a configuration for redis connection
 type RedisConfig struct {
-	Addr     string `toml:"address"`
+	Address  string `toml:"address"`
 	Username string `toml:"username"`
 	Password string `toml:"password"`
 	DB       int    `toml:"db"`
@@ -23,16 +23,16 @@ var (
 	RateLimiter *redis_rate.Limiter
 )
 
-// Init initializes a connection to redis server
+// Init initializes the DB clients
 func Init(config RedisConfig) {
 	addrType := "tcp"
-	if strings.HasPrefix(config.Addr, "/") { // for unix sockets
+	if strings.HasPrefix(config.Address, "/") { // for unix sockets
 		addrType = "unix"
 	}
 
 	rdb = redis.NewClient(&redis.Options{
 		Network:  addrType,
-		Addr:     config.Addr,
+		Addr:     config.Address,
 		Username: config.Username,
 		Password: config.Password,
 		DB:       config.DB,
@@ -45,10 +45,9 @@ func Init(config RedisConfig) {
 	RateLimiter = redis_rate.NewLimiter(rdb)
 }
 
-// Close closes the connection to redis server
+// Close closes the DB client
 func Close() {
-	err := rdb.Close()
-	if err != nil {
+	if err := rdb.Close(); err != nil {
 		log.Fatal(err)
 	}
 }

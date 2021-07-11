@@ -15,7 +15,7 @@ type UserInfo struct {
 	LastNames string `json:"cognoms"`
 }
 
-// Notice represents a single notice in a Notices API response
+// Notice represents a single notice in a NoticesResponse API response
 type Notice struct {
 	ID          int64        `json:"id"`
 	Title       string       `json:"titol"`
@@ -27,14 +27,14 @@ type Notice struct {
 	Attachments []Attachment `json:"adjunts"`
 }
 
-// Notices represents a user's notices API response
+// NoticesResponse represents a user's notices API response
 // Endpoint: /jo/avisos
-type Notices struct {
+type NoticesResponse struct {
 	Count   int      `json:"count"`
 	Results []Notice `json:"results"`
 }
 
-// Schedule represents a single schedule in a Schedules API response
+// Schedule represents a single schedule in a SchedulesResponse API response
 type Schedule struct {
 	SubjectCode string `json:"codi_assig"`
 	Group       string `json:"grup"`
@@ -45,14 +45,14 @@ type Schedule struct {
 	Classrooms  string `json:"aules"`
 }
 
-// Schedules represents a user's schedules API response
+// SchedulesResponse represents a user's schedules API response
 // Endpoint: /jo/classes
-type Schedules struct {
+type SchedulesResponse struct {
 	Count   int        `json:"count"`
 	Results []Schedule `json:"results"`
 }
 
-// Subject represents a single subject in a Subjects API response
+// Subject represents a single subject in a SubjectsResponse API response
 type Subject struct {
 	ID       string  `json:"id"`
 	URL      string  `json:"url"`
@@ -65,10 +65,10 @@ type Subject struct {
 	Name     string  `json:"nom"`
 }
 
-// Subjects represents a user's subjects API response
+// SubjectsResponse represents a user's subjects API response
 // Endpoint: /jo/assignatures
-type Subjects struct {
-	Count   int       `json:"id"`
+type SubjectsResponse struct {
+	Count   int       `json:"count"`
 	Results []Subject `json:"results"`
 }
 
@@ -81,38 +81,38 @@ type Attachment struct {
 	Size       int64    `json:"mida"`
 }
 
-const LoginRedirectBaseURL = "https://api.fib.upc.edu/v2/accounts/login/?next="
-
 // RedirectURL returns an attachment's FIB API login redirect URL
 // it's useful since FIB API cookies on the user's browser will expire, accessing an attachment's original URL after that will get an `Unauthorized` response
 func (a Attachment) RedirectURL() string {
-	// FIXME: waiting for the suffix bug in FIB API to be fixed
-	// the bug: attachments' URLs will have the `.json` suffixes if requested endpoint was `/jo/avisos.json`
-	return LoginRedirectBaseURL + url.QueryEscape(strings.TrimSuffix(a.URL, `.json`))
+	return LoginRedirectBaseURL + url.QueryEscape(a.URL)
 }
 
 // TimeDate represents the time&date data in API response JSONs
-type TimeDate time.Time
+type TimeDate struct {
+	time.Time
+}
+
+const timeDateLayout = "2006-01-02T15:04:05"
+
+var nilTime = (time.Time{}).Unix()
 
 // UnmarshalJSON implements the json.Unmarshaler interface for TimeDate type
 // it un-marshals the `2006-01-02T15:04:05`-format time&date strings in the API response JSONs to TimeDate type
-func (j *TimeDate) UnmarshalJSON(b []byte) (err error) {
+func (t *TimeDate) UnmarshalJSON(b []byte) error {
 	tzMadrid, err := time.LoadLocation("Europe/Madrid")
 	if err != nil {
-		return
+		return err
 	}
 
-	t, err := time.ParseInLocation("2006-01-02T15:04:05", strings.Trim(string(b), "\""), tzMadrid)
-	if err != nil {
-		return
-	}
-
-	*j = TimeDate(t)
-	return
+	t.Time, err = time.ParseInLocation(timeDateLayout, strings.Trim(string(b), "\""), tzMadrid)
+	return err
 }
 
 // MarshalJSON implements the json.Marshaler interface for TimeDate type
 // it marshals the values of fields with TimeDate type to UNIX timestamp format
-func (j TimeDate) MarshalJSON() ([]byte, error) {
-	return []byte(strconv.FormatInt(time.Time(j).Unix(), 10)), nil
+func (t TimeDate) MarshalJSON() ([]byte, error) {
+	if t.Time.Unix() == nilTime {
+		return []byte("nil"), nil
+	}
+	return []byte(strconv.FormatInt(t.Time.Unix(), 10)), nil
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coolspring8/go-lolhtml"
+	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
 	log "github.com/sirupsen/logrus"
 
 	"RacoBot/internal/db"
@@ -41,97 +41,107 @@ var supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "
 func (n NoticeMessage) String() (result string) {
 	if n.Text != "" {
 		var err error
-		result, err = lolhtml.RewriteString(
+		result, err = hr.RewriteString(
 			n.Text,
-			&lolhtml.Handlers{
-				ElementContentHandler: []lolhtml.ElementContentHandler{
+			&hr.Handlers{
+				ElementContentHandler: []hr.ElementContentHandler{
 					{
 						Selector: "div[class='extraInfo']",
 						// add newlines before exam info titles
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
-							err := e.InsertBeforeStartTagAsText("\n")
-							if err != nil {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							if err := e.InsertBeforeStartTagAsText("\n"); err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							return lolhtml.Continue
+							return hr.Continue
 						},
 					},
 					{
 						Selector: "span[id='horaExamen']",
 						// add newlines after exam time data
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
-							err := e.InsertAfterEndTagAsText("\n")
-							if err != nil {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							if err := e.InsertAfterEndTagAsText("\n"); err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							return lolhtml.Continue
+							return hr.Continue
 						},
 					},
 					{
 						Selector: "span[class='label']",
 						// italicize info titles
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
-							err := e.SetTagName("i")
-							if err != nil {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							if err := e.SetTagName("i"); err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							err = e.RemoveAttribute("class")
-							if err != nil {
+							if err := e.RemoveAttribute("class"); err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							err = e.InsertBeforeStartTagAsHTML("- ")
-							if err != nil {
+							if err := e.InsertBeforeStartTagAsHTML("- "); err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							return lolhtml.Continue
+							return hr.Continue
+						},
+					},
+					{
+						Selector: "span[style='text-decoration:underline']",
+						// underlines
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							if err := e.RemoveAttribute("style"); err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							if err := e.SetTagName("u"); err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							return hr.Continue
 						},
 					},
 					{
 						Selector: "br",
 						// Telegram doesn't support <br> but \n
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							err := e.ReplaceAsText("\n")
 							if err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							return lolhtml.Continue
+							return hr.Continue
 						},
 					},
 					{
 						Selector: "li",
 						// Telegram doesn't support <ul> & <li>, so add a `- ` at the beginning as an indicator
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							err := e.InsertBeforeStartTagAsText("- ")
 							if err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
 							err = e.InsertAfterEndTagAsText("\n") // newline after each entry
 							if err != nil {
 								log.Error(err)
-								return lolhtml.Stop
+								return hr.Stop
 							}
-							return lolhtml.Continue
+							return hr.Continue
 						},
 					},
 					{
 						Selector: "*",
 						// strip all the other tags since Telegram doesn't support them
-						ElementHandler: func(e *lolhtml.Element) lolhtml.RewriterDirective {
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							tagName := e.TagName()
 							for _, supportedTagName := range supportedTagNames {
 								if tagName == supportedTagName {
-									return lolhtml.Continue
+									return hr.Continue
 								}
 							}
 							e.RemoveAndKeepContent()
-							return lolhtml.Continue
+							return hr.Continue
 						},
 					},
 				},
@@ -141,10 +151,11 @@ func (n NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", n.ID)
 		}
+		result = "\n\n" + result
 	}
 
 	// TODO: use template
-	result = fmt.Sprintf("[%s] <b>%s</b>\n\n%s",
+	result = fmt.Sprintf("[%s] <b>%s</b>%s",
 		n.SubjectCode,
 		n.Title,
 		result)

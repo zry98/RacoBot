@@ -36,12 +36,6 @@ func main() {
 	r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)      // Telegram Bot update
 	r.HandleFunc(config.FIBAPIOAuthRedirectPath, HandleOAuthRedirect) // FIB API OAuth redirect
 
-	//r.HandleFunc("/debug", HandleDebug)
-	//r.HandleFunc("/debug/pprof/", pprof.Index)
-	//r.HandleFunc("/debug/pprof/{action}", pprof.Index)
-	//r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	//r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.Host, config.Port),
 		Handler:      middleware(r),

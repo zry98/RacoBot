@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -49,20 +50,36 @@ func (c *Client) GetNotices() ([]Notice, error) {
 		return nil, err
 	}
 
-	var notices Notices
+	var notices NoticesResponse
 	err = json.Unmarshal(body, &notices)
 	if err != nil {
-		err = fmt.Errorf("error parsing Notices response: %s\n%s", string(body), err)
+		return nil, fmt.Errorf("error parsing NoticesResponse response: %s\n%s", string(body), err)
 	}
+
 	return notices.Results, nil
 }
 
+// GetNoticesWithHash gets the user's notices with the response body's hash
+func (c *Client) GetNoticesWithHash() ([]Notice, string, error) {
+	body, _, err := c.request(http.MethodGet, NoticesURL)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var notices NoticesResponse
+	err = json.Unmarshal(body, &notices)
+	if err != nil {
+		return nil, "", fmt.Errorf("error parsing NoticesResponse response: %s\n%s", string(body), err)
+	}
+
+	return notices.Results, fmt.Sprintf("%08x", crc32.ChecksumIEEE(body)), nil
+}
+
 // GetNotice gets a specific notice with the given ID
-// it returns an empty Notice with ID==0 when it's not available to the user
-func (c *Client) GetNotice(ID int64) (notice Notice, err error) {
+func (c *Client) GetNotice(ID int64) (Notice, error) {
 	notices, err := c.GetNotices()
 	if err != nil {
-		return
+		return Notice{}, err
 	}
 
 	for _, n := range notices {
@@ -70,7 +87,7 @@ func (c *Client) GetNotice(ID int64) (notice Notice, err error) {
 			return n, nil
 		}
 	}
-	return
+	return Notice{}, NoticeNotFoundError
 }
 
 // GetSubjects gets the user's subjects
@@ -80,10 +97,10 @@ func (c *Client) GetSubjects() ([]Subject, error) {
 		return nil, err
 	}
 
-	var subjects Subjects
+	var subjects SubjectsResponse
 	err = json.Unmarshal(body, &subjects)
 	if err != nil {
-		err = fmt.Errorf("error parsing Subjects response: %s\n%s", string(body), err)
+		err = fmt.Errorf("error parsing SubjectsResponse response: %s\n%s", string(body), err)
 	}
 	return subjects.Results, nil
 }
@@ -108,8 +125,6 @@ func (c *Client) RevokeToken() (err error) {
 // GetAttachmentFileData gets the given attachment's file data
 // Be careful: some attachments posted on Racó has copyright and should not be stored nor accessed by third-parties
 func (c *Client) GetAttachmentFileData(a Attachment) (data io.Reader, err error) {
-	// FIXME: waiting for the bug in FIB API to be fixed
-	// the bug: attachments' URLs will have the `.json` suffixes if requested endpoint was `/jo/avisos.json`
 	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
 	if err != nil {
 		return

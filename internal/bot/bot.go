@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -113,7 +114,7 @@ func Init(config BotConfig) {
 		return c.Send(reply)
 	}))
 
-	// on command `/logout`, revokes the user's FIB API OAuth token
+	// on command `/logout`, revokes the user's FIB API OAuth token and deletes it from the database
 	b.Handle("/logout", middleware(func(c tb.Context) (err error) {
 		userID := int64(c.Sender().ID)
 		err = NewClient(userID).Logout()
@@ -121,7 +122,7 @@ func Init(config BotConfig) {
 			return
 		}
 
-		return c.Send("OAuth token revoked")
+		return c.Send("Logout successful")
 	}))
 
 	// on command `/debug \d+`, replies notice message with the given ID in payload
@@ -147,54 +148,41 @@ func Init(config BotConfig) {
 	// on command `/test`, replies the latest one notice message
 	b.Handle("/test", middleware(func(c tb.Context) (err error) {
 		userID := int64(c.Sender().ID)
-		lastNoticeID, err := db.GetUserLastNoticeID(userID)
-		if err != nil {
-			return
-		}
-
-		var reply NoticeMessage
 		client := NewClient(userID)
-		if lastNoticeID != 0 {
-			reply, err = client.GetNotice(lastNoticeID)
-			if err != nil {
-				return
-			}
-
-			return c.Send(reply.String(), sendNoticeMessageOption)
+		if client == nil {
+			return TokenNotFoundError
 		}
-
-		notices, err := client.GetNotices()
-		if err != nil {
-			return
-		}
-		if len(notices) == 0 {
-			return c.Send("No notice available")
-		}
-
-		for _, n := range notices {
-			if n.ID > lastNoticeID {
-				lastNoticeID = n.ID
-				reply = n
-			}
-		}
-
-		err = c.Send(reply.String(), sendNoticeMessageOption)
+		notices, noticesHash, err := client.GetNoticesWithHash()
 		if err != nil {
 			return
 		}
 
-		return db.PutUserLastNoticeID(userID, lastNoticeID)
+		sort.Slice(notices, func(i, j int) bool {
+			return notices[i].ModifiedAt.Unix() < notices[j].ModifiedAt.Unix()
+		})
+
+		err = db.PutLastState(userID, db.LastState{
+			NoticesHash:     noticesHash,
+			NoticeTimestamp: notices[len(notices)-1].ModifiedAt.Unix(),
+		})
+		if err != nil {
+			return
+		}
+
+		return c.Send(NoticeMessage{notices[len(notices)-1]}.String(), sendNoticeMessageOption)
 	}))
 
+	// update webhook URL
 	err = setWebhook(config.WebhookURL)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	log.Info("Bot OK")
+	log.Info("Bot OK") // all done, start serving
 }
 
+// setWebhook sets the Telegram bot webhook URL to the given one
 func setWebhook(URL string) error {
 	resp, err := http.Get(fmt.Sprintf("https://api.telegram.org/bot%s/setWebhook?url=%s", b.Token, URL))
 	if err != nil {
@@ -225,6 +213,7 @@ func setWebhook(URL string) error {
 	return fmt.Errorf("error setting webhook: (code %d) %s", r.ErrorCode, r.Description)
 }
 
+// middleware intercepts and handles the error returned by the next handler
 func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) (err error) {
 		defer func() {

@@ -3,9 +3,9 @@ package bot
 import (
 	"errors"
 	"fmt"
-
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
+	"sort"
 
 	"RacoBot/internal/db"
 	"RacoBot/pkg/fibapi"
@@ -87,11 +87,6 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 		return
 	}
 
-	err = db.PutNotices(res) // cache notices
-	if err != nil {
-		return
-	}
-
 	for _, n := range res {
 		ns = append(ns, NoticeMessage{n})
 	}
@@ -123,30 +118,36 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	res, err := c.GetNotices()
+	lastState, err := db.GetLastState(c.userID)
 	if err != nil {
 		return
 	}
 
-	lastSentNoticeID, err := db.GetUserLastNoticeID(c.userID)
+	res, noticesHash, err := c.Client.GetNoticesWithHash()
 	if err != nil {
 		return
 	}
 
-	// TODO: include newly modified old notices
-	newLastSentNoticeID := lastSentNoticeID
-	for _, n := range res {
-		if n.ID > lastSentNoticeID && lastSentNoticeID != 0 {
-			ns = append(ns, n)
-		}
-		if n.ID > newLastSentNoticeID {
-			newLastSentNoticeID = n.ID
+	if noticesHash == lastState.NoticesHash { // no change at all
+		return
+	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].ModifiedAt.Unix() < res[j].ModifiedAt.Unix()
+	})
+
+	if lastState.NoticesHash != "" && lastState.NoticeTimestamp != 0 { // if not a new user
+		for _, n := range res {
+			if n.ModifiedAt.Unix() > lastState.NoticeTimestamp { // posted or modified later than the last state
+				ns = append(ns, NoticeMessage{n})
+			}
 		}
 	}
 
-	if newLastSentNoticeID > lastSentNoticeID {
-		err = db.PutUserLastNoticeID(c.userID, newLastSentNoticeID)
-	}
+	err = db.PutLastState(c.userID, db.LastState{
+		NoticesHash:     noticesHash,
+		NoticeTimestamp: res[len(res)-1].ModifiedAt.Unix(),
+	})
 	return
 }
 
@@ -156,17 +157,12 @@ func (c *Client) Logout() (err error) {
 		err = TokenNotFoundError
 		return
 	}
-	defer func() {
-		err := db.DeleteToken(c.userID)
-		if err != nil {
-			log.Error(err)
-		}
 
-		err = db.DeleteToken(c.userID)
-		if err != nil {
-			log.Error(err)
-		}
-	}()
+	err = c.Client.RevokeToken()
+	if err != nil {
+		return
+	}
 
-	return c.Client.RevokeToken()
+	err = db.DeleteToken(c.userID)
+	return
 }

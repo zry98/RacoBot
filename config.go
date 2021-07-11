@@ -17,14 +17,15 @@ import (
 
 // Config represents a complete configuration
 type Config struct {
-	Host                    string              `toml:"host"`
-	Port                    int                 `toml:"port"`
-	Log                     LogConfig           `toml:"log"`
-	TLS                     TLSConfig           `toml:"tls"`
-	Redis                   db.RedisConfig      `toml:"redis"`
-	TelegramBot             bot.BotConfig       `toml:"telegram_bot"`
-	FIBAPI                  fibapi.FIBAPIConfig `toml:"fib_api"`
-	JobsConfig              jobs.JobsConfig     `toml:"jobs"`
+	Host        string              `toml:"host"`
+	Port        int                 `toml:"port"`
+	Log         LogConfig           `toml:"log"`
+	TLS         TLSConfig           `toml:"tls"`
+	Redis       db.RedisConfig      `toml:"redis"`
+	TelegramBot bot.BotConfig       `toml:"telegram_bot"`
+	FIBAPI      fibapi.FIBAPIConfig `toml:"fib_api"`
+	JobsConfig  jobs.JobsConfig     `toml:"jobs"`
+
 	TelegramBotWebhookPath  string
 	FIBAPIOAuthRedirectPath string
 }
@@ -90,7 +91,7 @@ func (c *Config) setupLogger() {
 		}
 
 		log.SetLevel(l)
-		log.Info("Log level set to: ", l)
+		log.Info("log level set to: ", l)
 	}
 
 	if c.Log.Path != "" {
