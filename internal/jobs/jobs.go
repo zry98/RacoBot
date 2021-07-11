@@ -8,6 +8,7 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
+	"RacoBot/pkg/fibapi"
 )
 
 // JobsConfig represents a configuration for the jobs
@@ -62,9 +63,18 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 	}
 
 	for _, userID := range userIDs {
+		checkedUserCount++
 		newNotices, err := bot.NewClient(userID).GetNewNotices()
 		if err != nil {
-			logger.Errorf("Error getting new notices for user %d, detail: %s", userID, err.Error())
+			if err == fibapi.AuthorizationExpiredError {
+				logger.Infof("FIB API token expired for user %d", userID)
+				bot.SendMessage(userID, bot.FIBAPIOAuthAuthorizationExpiredErrorMessage)
+				if err = db.DeleteToken(userID); err != nil {
+					logger.Error(err)
+				}
+			} else {
+				logger.Errorf("Error getting new notices for user %d, detail: %s", userID, err.Error())
+			}
 			continue
 		}
 		logger.Infof("Fetched %d new notices for user %d", len(newNotices), userID)
@@ -74,7 +84,6 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 			logger.Infof("Sent new notice %d to user %d", n.ID, userID)
 			sentMessageCount++
 		}
-		checkedUserCount++
 	}
 	logger.Infof("Done, total checked users: %d, total sent messages: %d", checkedUserCount, sentMessageCount)
 }

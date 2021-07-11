@@ -3,9 +3,10 @@ package bot
 import (
 	"errors"
 	"fmt"
+	"sort"
+
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"sort"
 
 	"RacoBot/internal/db"
 	"RacoBot/pkg/fibapi"
