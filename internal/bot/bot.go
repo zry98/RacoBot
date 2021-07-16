@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sort"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -37,8 +36,9 @@ type Bot struct {
 
 // predefined reply texts
 const (
-	FIBAPIOAuthAuthorizationExpiredErrorMessage = "Authorization expired, /login again"
-	InternalErrorMessage                        = "Internal Error"
+	FIBAPIOAuthAuthorizationExpiredErrorMessage = "Authorization expired, please /login again"
+	InternalErrorMessage                        = "<i>Internal Error</i>"
+	NoNoticesAvailableMessage                   = "<i>No notices available</i>"
 )
 
 // sending options
@@ -68,119 +68,13 @@ func Init(config BotConfig) {
 	}
 	b = &Bot{*_b}
 
-	// on command `/start`, replies a `/login` message
-	b.Handle("/start", func(c tb.Context) (err error) {
-		return c.Send("/login to authorize Racó Bot") // TODO: make it nicer
-	})
-
-	// on command `/login`, replies a FIB API OAuth authorization link message for the user
-	b.Handle("/login", func(c tb.Context) (err error) {
-		userID := int64(c.Sender().ID)
-		token, err := db.GetToken(userID)
-		if err != nil && err != db.TokenNotFoundError {
-			log.Error(err)
-			return
-		}
-		if token != nil && token.AccessToken != "" && token.RefreshToken != "" {
-			// already logged-in user
-			return c.Send("Already logged-in, check /whoami; or, /logout to revoke the authorization")
-		}
-
-		// new user
-		session, err := db.NewLoginSession(userID)
-		if err != nil {
-			log.Error(err)
-			return c.Send(InternalErrorMessage)
-		}
-
-		m, err := b.sendMessage(userID, LoginLinkMessage{session})
-		if err != nil {
-			log.Error(err)
-			return c.Send(InternalErrorMessage)
-		}
-		session.MessageID = int64(m.ID)
-
-		return db.PutLoginSession(session)
-	})
-
-	// on command `/whoami`, replies the user's full name
-	b.Handle("/whoami", middleware(func(c tb.Context) (err error) {
-		userID := int64(c.Sender().ID)
-		reply, err := NewClient(userID).GetFullName()
-		if err != nil {
-			return
-		}
-
-		return c.Send(reply)
-	}))
-
-	// on command `/logout`, revokes the user's FIB API OAuth token and deletes it from the database
-	b.Handle("/logout", middleware(func(c tb.Context) (err error) {
-		userID := int64(c.Sender().ID)
-		err = NewClient(userID).Logout()
-		if err != nil {
-			return
-		}
-
-		return c.Send("Logout successful")
-	}))
-
-	// on command `/debug \d+`, replies notice message with the given ID in payload
-	b.Handle("/debug", middleware(func(c tb.Context) (err error) {
-		userID := int64(c.Sender().ID)
-		messageID, err := strconv.ParseInt(c.Message().Payload, 10, 64)
-		if err != nil {
-			return c.Reply("Invalid payload")
-		}
-
-		notice, err := NewClient(userID).GetNotice(messageID)
-		if err != nil {
-			return
-		}
-		if notice.ID == 0 {
-			// maybe don't exist, or not available to the user
-			return c.Send("Notice unavailable")
-		}
-
-		return c.Send(notice.String(), sendNoticeMessageOption)
-	}))
-
-	// on command `/test`, replies the latest one notice message
-	b.Handle("/test", middleware(func(c tb.Context) (err error) {
-		userID := int64(c.Sender().ID)
-		client := NewClient(userID)
-		if client == nil {
-			return TokenNotFoundError
-		}
-		notices, noticesHash, err := client.GetNoticesWithHash()
-		if err != nil {
-			return
-		}
-		if len(notices) == 0 {
-			err = db.PutLastState(userID, db.LastState{
-				NoticesHash: noticesHash,
-			})
-			if err != nil {
-				return
-			}
-
-			return c.Send("No notices available")
-		}
-
-		sort.Slice(notices, func(i, j int) bool {
-			return notices[i].ModifiedAt.Unix() < notices[j].ModifiedAt.Unix()
-		})
-
-		err = db.PutLastState(userID, db.LastState{
-			NoticesHash:     noticesHash,
-			NoticeTimestamp: notices[len(notices)-1].ModifiedAt.Unix(),
-		})
-		if err != nil {
-			return
-		}
-
-		return c.Send(NoticeMessage{notices[len(notices)-1]}.String(), sendNoticeMessageOption)
-	}))
+	// bind handlers
+	b.Handle("/start", start)
+	b.Handle("/login", login)
+	b.Handle("/whoami", middleware(whoami))
+	b.Handle("/logout", middleware(logout))
+	b.Handle("/debug", middleware(debug))
+	b.Handle("/test", middleware(test))
 
 	// update webhook URL
 	err = setWebhook(config.WebhookURL)
