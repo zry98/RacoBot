@@ -133,6 +133,13 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 		return
 	}
 
+	if len(res) == 0 {
+		err = db.PutLastState(c.userID, db.LastState{
+			NoticesHash: noticesHash,
+		})
+		return
+	}
+
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].ModifiedAt.Unix() < res[j].ModifiedAt.Unix()
 	})

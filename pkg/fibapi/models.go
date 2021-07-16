@@ -34,8 +34,8 @@ type NoticesResponse struct {
 	Results []Notice `json:"results"`
 }
 
-// Schedule represents a single schedule in a SchedulesResponse API response
-type Schedule struct {
+// Class represents a single class in a ScheduleResponse API response
+type Class struct {
 	SubjectCode string `json:"codi_assig"`
 	Group       string `json:"grup"`
 	DayOfWeek   int    `json:"dia_setmana"`
@@ -45,11 +45,11 @@ type Schedule struct {
 	Classrooms  string `json:"aules"`
 }
 
-// SchedulesResponse represents a user's schedules API response
+// ScheduleResponse represents a user's schedule API response
 // Endpoint: /jo/classes
-type SchedulesResponse struct {
-	Count   int        `json:"count"`
-	Results []Schedule `json:"results"`
+type ScheduleResponse struct {
+	Count   int     `json:"count"`
+	Results []Class `json:"results"`
 }
 
 // Subject represents a single subject in a SubjectsResponse API response

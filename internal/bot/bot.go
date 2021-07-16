@@ -156,6 +156,16 @@ func Init(config BotConfig) {
 		if err != nil {
 			return
 		}
+		if len(notices) == 0 {
+			err = db.PutLastState(userID, db.LastState{
+				NoticesHash: noticesHash,
+			})
+			if err != nil {
+				return
+			}
+
+			return c.Send("No notices available")
+		}
 
 		sort.Slice(notices, func(i, j int) bool {
 			return notices[i].ModifiedAt.Unix() < notices[j].ModifiedAt.Unix()
