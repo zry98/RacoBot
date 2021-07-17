@@ -11,47 +11,41 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"golang.org/x/oauth2"
 )
 
 // LoginSession represents a session of login (FIB API OAuth authorization) procedure
 type LoginSession struct {
-	State     string
-	UserID    int64 `json:"u"`
-	MessageID int64 `json:"m"`
+	State              string
+	UserID             int64  `json:"u"`
+	LoginLinkMessageID int64  `json:"m"`
+	UserLanguageCode   string `json:"l"`
 }
 
-// User represents a user's info store in database
+// User represents a user's data
 type User struct {
-	ID                  int64  `db:"id"`
-	AccessToken         string `db:"access_token"`
-	RefreshToken        string `db:"refresh_token"`
-	TokenExpiry         int64  `db:"token_expiry"`
-	LastNoticeTimestamp int64  `db:"last_notice_timestamp"`
-}
-
-// LastState represents a user's last state
-// including the FIB API notices response body's hash and the last one notice's `ModifiedAt` UNIX timestamp
-type LastState struct {
-	NoticesHash     string
-	NoticeTimestamp int64
+	ID                  int64  `json:"-"`
+	AccessToken         string `json:"a"`
+	RefreshToken        string `json:"r"`
+	TokenExpiry         int64  `json:"e"`
+	LanguageCode        string `json:"l,omitempty"`
+	LastNoticesHash     string `json:"h,omitempty"`
+	LastNoticeTimestamp int64  `json:"t,omitempty"`
 }
 
 // key prefixes
 const (
 	loginSessionKeyPrefix = "s"
-	userTokenKeyPrefix    = "t"
-	lastStateKeyPrefix    = "l"
+	userKeyPrefix         = "u"
 )
 
 // errors
 var (
 	LoginSessionNotFoundError = errors.New("db: login session not found")
-	TokenNotFoundError        = errors.New("db: token not found")
+	UserNotFoundError         = errors.New("db: user not found")
 )
 
 // NewLoginSession creates a new login session for a user with the given ID
-func NewLoginSession(userID int64) (s LoginSession, err error) {
+func NewLoginSession(userID int64, languageCode string) (s LoginSession, err error) {
 	// make a random string as state
 	buf := make([]byte, 16)
 	_, err = rand.Read(buf)
@@ -60,8 +54,9 @@ func NewLoginSession(userID int64) (s LoginSession, err error) {
 	}
 
 	s = LoginSession{
-		State:  base64.StdEncoding.EncodeToString(buf),
-		UserID: userID,
+		State:            base64.StdEncoding.EncodeToString(buf),
+		UserID:           userID,
+		UserLanguageCode: languageCode,
 	}
 	return
 }
@@ -98,53 +93,44 @@ func DeleteLoginSession(state string) error {
 	return rdb.Del(ctx, key).Err()
 }
 
-// GetToken gets the OAuth token of the user with the given ID from KV cache or SQL database
-func GetToken(userID int64) (token *oauth2.Token, err error) {
-	key := fmt.Sprintf("%s:%d", userTokenKeyPrefix, userID)
+// GetUser gets the user with the given ID
+func GetUser(userID int64) (user User, err error) {
+	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
-			err = TokenNotFoundError
+			err = UserNotFoundError
 		}
 		return
 	}
 
-	fields := strings.Split(value, ",")
-	if len(fields) != 3 {
-		return nil, fmt.Errorf("db: token format error (%s)", "wrong fields number")
+	if err = json.Unmarshal([]byte(value), &user); err != nil {
+		return
 	}
 
-	exp, err := strconv.ParseInt(fields[2], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("db: token format error (%s)", err.Error())
-	}
-
-	token = &oauth2.Token{
-		AccessToken:  fields[0],
-		TokenType:    "Bearer",
-		RefreshToken: fields[1],
-		Expiry:       time.Unix(exp, 0),
-	}
+	user.ID = userID
 	return
 }
 
-// PutToken puts the given OAuth token of the user with the given ID
-func PutToken(userID int64, token *oauth2.Token) error {
-	value := fmt.Sprintf("%s,%s,%d", token.AccessToken, token.RefreshToken, token.Expiry.Unix())
-	key := fmt.Sprintf("%s:%d", userTokenKeyPrefix, userID)
-	return rdb.Set(ctx, key, value, 0).Err() // TODO: put only the access token and set a TTL with its expiry
+// PutUser puts the given user
+func PutUser(user User) error {
+	value, err := json.Marshal(user)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("%s:%d", userKeyPrefix, user.ID)
+	return rdb.Set(ctx, key, value, 0).Err()
 }
 
-// DeleteToken deletes the OAuth token of the user with the given ID
-func DeleteToken(userID int64) error {
-	key := fmt.Sprintf("%s:%d", userTokenKeyPrefix, userID)
+// DeleteUser deletes the user with the given ID
+func DeleteUser(userID int64) error {
+	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
 	return rdb.Del(ctx, key).Err()
 }
 
-// GetUserIDs gets all users' IDs from token keys
-// TODO: rewrite it to get all users' tokens at once using pipeline instead
+// GetUserIDs gets all users' IDs from keys
 func GetUserIDs() (userIDs []int64, err error) {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", userTokenKeyPrefix)).Result()
+	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", userKeyPrefix)).Result()
 	if err != nil {
 		return
 	}
@@ -158,35 +144,4 @@ func GetUserIDs() (userIDs []int64, err error) {
 		userIDs = append(userIDs, userID)
 	}
 	return
-}
-
-// GetLastState gets the last state of the user with the given ID
-func GetLastState(userID int64) (lastState LastState, err error) {
-	key := fmt.Sprintf("%s:%d", lastStateKeyPrefix, userID)
-	value, err := rdb.Get(ctx, key).Result()
-	if err != nil {
-		if err == redis.Nil {
-			err = nil // return empty last state without error
-		}
-		return
-	}
-
-	fields := strings.Split(value, ",")
-	if len(fields) != 2 {
-		return LastState{}, fmt.Errorf("db: last state format error (%s)", "wrong fields number")
-	}
-
-	lastState.NoticesHash = fields[0]
-	lastState.NoticeTimestamp, err = strconv.ParseInt(fields[1], 10, 64)
-	if err != nil {
-		return LastState{}, fmt.Errorf("db: last state format error (%s)", err.Error())
-	}
-	return
-}
-
-// PutLastState puts the given last state of the user with the given ID
-func PutLastState(userID int64, lastState LastState) error {
-	value := fmt.Sprintf("%s,%d", lastState.NoticesHash, lastState.NoticeTimestamp)
-	key := fmt.Sprintf("%s:%d", lastStateKeyPrefix, userID)
-	return rdb.Set(ctx, key, value, 0).Err()
 }

@@ -10,6 +10,7 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
+	"RacoBot/internal/locales"
 	"RacoBot/internal/ratelimiters"
 	"RacoBot/pkg/fibapi"
 )
@@ -88,19 +89,19 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	loginSession, err := db.GetLoginSession(state)
-	if err != nil && err != db.LoginSessionNotFoundError {
-		log.Error(err)
-
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintln(w, InvalidRequestResponseBody)
-		return
-	}
-	if err == db.LoginSessionNotFoundError || (&loginSession != nil && loginSession.UserID == 0 || loginSession.MessageID == 0) {
+	if err == db.LoginSessionNotFoundError || (&loginSession != nil && loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0) {
 		log.WithFields(log.Fields{
 			"ip": r.RemoteAddr,
 			"s":  state,
 			"c":  code,
 		}).Info("Invalid redirect request (login session not found)")
+
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintln(w, InvalidRequestResponseBody)
+		return
+	}
+	if err != nil {
+		log.Error(err)
 
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintln(w, InvalidRequestResponseBody)
@@ -126,7 +127,13 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.PutToken(loginSession.UserID, token)
+	err = db.PutUser(db.User{
+		ID:           loginSession.UserID,
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		TokenExpiry:  token.Expiry.Unix(),
+		LanguageCode: loginSession.UserLanguageCode,
+	})
 	if err != nil {
 		log.Error(err)
 
@@ -145,11 +152,10 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bot.DeleteLoginLinkMessage(loginSession)
-	welcomeMessage := fmt.Sprintf("Hello, %s!", userInfo.FirstName)
-	bot.SendMessage(loginSession.UserID, welcomeMessage)
+	greetingMessage := fmt.Sprintf(locales.Get(loginSession.UserLanguageCode).GreetingMessage, userInfo.FirstName)
+	bot.SendMessage(loginSession.UserID, greetingMessage)
 
-	// TODO: make it nicer
-	guideMessage := fmt.Sprintf("You can use /test to preview the latest one notice, \n/logout to stop receiving messages and revoke the authorization on server")
+	guideMessage := locales.Get(loginSession.UserLanguageCode).HelpMessage
 	bot.SendMessage(loginSession.UserID, guideMessage, bot.SendSilentMessageOption)
 
 	fmt.Fprintln(w, AuthorizedResponseBody)

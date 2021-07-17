@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"RacoBot/internal/db"
+	"RacoBot/internal/locales"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -21,12 +22,13 @@ type LoginLinkMessage struct {
 // String formats a LoginLinkMessage to a proper string with a generated Authorization URL ready to be sent by bot
 func (m LoginLinkMessage) String() string {
 	authorizationURL := fibapi.NewAuthorizationURL(m.State)
-	return fmt.Sprintf("<a href=\"%s\">Authorize RacóBot</a>", authorizationURL)
+	return fmt.Sprintf(locales.Get(m.UserLanguageCode).LoginLinkMessage, authorizationURL)
 }
 
 // NoticeMessage represents a FIB API Notice message
 type NoticeMessage struct {
 	fibapi.Notice
+	user db.User
 }
 
 const (
@@ -39,6 +41,8 @@ var supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
 func (n NoticeMessage) String() (result string) {
+	locale := locales.Get(n.user.LanguageCode)
+
 	if n.Text != "" {
 		var err error
 		result, err = hr.RewriteString(
@@ -167,15 +171,15 @@ func (n NoticeMessage) String() (result string) {
 			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL(), attachment.Name, fileSize)
 		}
 
-		noun := "attachment"
+		noun := locale.NoticeMessageAttachmentNounPlural
 		if len(n.Attachments) > 1 {
-			noun += "s"
+			noun = locale.NoticeMessageAttachmentNounPlural
 		}
-		result = fmt.Sprintf("%s\n\n<i>- With %d %s:</i>\n%s", result, len(n.Attachments), noun, sb.String())
+		result = fmt.Sprintf(locale.NoticeMessageAttachmentIndicator, result, len(n.Attachments), noun, sb.String())
 	}
 
 	if len(result) > messageMaxLength { // send Racó notice URL instead if message length exceeds the limit of 4096 characters
-		result = fmt.Sprintf("[%s] <b>%s</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href=\"%s\">this link</a>.",
+		result = fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage,
 			n.SubjectCode,
 			n.Title,
 			fmt.Sprintf(RacoNoticeURLTemplate, n.SubjectCode, n.ID))

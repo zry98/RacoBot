@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"RacoBot/internal/locales"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -29,6 +30,9 @@ func RunJobs(config JobsConfig) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warn("error recovered in RunJobs ", err)
+			if err == bot.UserNotFoundError {
+
+			}
 		}
 	}()
 
@@ -64,12 +68,21 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 
 	for _, userID := range userIDs {
 		checkedUserCount++
-		newNotices, err := bot.NewClient(userID).GetNewNotices()
+		client := bot.NewClient(userID)
+		if client == nil {
+			bot.SendMessage(userID, locales.Get("en").FIBAPIAuthorizationExpiredErrorMessage)
+			if err = db.DeleteUser(userID); err != nil {
+				logger.Error(err)
+			}
+			continue
+		}
+
+		newNotices, err := client.GetNewNotices()
 		if err != nil {
 			if err == fibapi.AuthorizationExpiredError {
 				logger.Infof("FIB API token expired for user %d", userID)
-				bot.SendMessage(userID, bot.FIBAPIOAuthAuthorizationExpiredErrorMessage)
-				if err = db.DeleteToken(userID); err != nil {
+				bot.SendMessage(userID, locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
+				if err = db.DeleteUser(userID); err != nil {
 					logger.Error(err)
 				}
 			} else {

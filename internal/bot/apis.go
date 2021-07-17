@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
@@ -14,33 +15,36 @@ import (
 
 // Client represents a FIB API client initialized with a Telegram UserID
 type Client struct {
-	userID int64
-	token  *oauth2.Token
+	User db.User
 	fibapi.Client
 }
 
 // errors
 var (
-	TokenNotFoundError = errors.New("user token not found")
+	UserNotFoundError = errors.New("user not found")
 )
 
 // NewClient initializes a FIB API client with the given Telegram UserID
 // if that UserID doesn't exist in the database, it will return nil and leave it for the later API caller to handle
 // thus simplifies its usage to: `xxx, err := NewClient(userID).GetXXX()`
 func NewClient(userID int64) *Client {
-	token, err := db.GetToken(userID)
-	if err != nil || token == nil {
+	user, err := db.GetUser(userID)
+	if err != nil || user.AccessToken == "" || user.RefreshToken == "" {
 		return nil
 	}
 
 	return &Client{
-		userID: userID,
-		token:  token,
-		Client: *fibapi.NewClient(*token),
+		User: user,
+		Client: *fibapi.NewClient(oauth2.Token{
+			AccessToken:  user.AccessToken,
+			RefreshToken: user.RefreshToken,
+			Expiry:       time.Unix(user.TokenExpiry, 0),
+			TokenType:    "Bearer",
+		}),
 	}
 }
 
-// updateToken updates the user's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.Client
+// updateToken updates the User's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.Client
 // it should be called (and should be deferred) in every API caller
 func (c *Client) updateToken() {
 	newToken, err := c.Client.Transport.(*oauth2.Transport).Source.Token()
@@ -49,19 +53,21 @@ func (c *Client) updateToken() {
 		return
 	}
 
-	if newToken.AccessToken != c.token.AccessToken {
-		err = db.PutToken(c.userID, newToken)
-		if err != nil {
+	if newToken.AccessToken != c.User.AccessToken {
+		c.User.AccessToken = newToken.AccessToken
+		c.User.RefreshToken = newToken.RefreshToken
+		c.User.TokenExpiry = newToken.Expiry.Unix()
+		if err = db.PutUser(c.User); err != nil {
 			log.Error(err)
 			return
 		}
 	}
 }
 
-// GetFullName gets the user's full name (`${firstName} ${lastName}`)
+// GetFullName gets the User's full name (`${firstName} ${lastName}`)
 func (c *Client) GetFullName() (fullName string, err error) {
 	if c == nil {
-		err = TokenNotFoundError
+		err = UserNotFoundError
 		return
 	}
 	defer c.updateToken()
@@ -75,10 +81,10 @@ func (c *Client) GetFullName() (fullName string, err error) {
 	return
 }
 
-// GetNotices gets the user's notice messages
+// GetNotices gets the User's notice messages
 func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
-		err = TokenNotFoundError
+		err = UserNotFoundError
 		return
 	}
 	defer c.updateToken()
@@ -89,7 +95,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	}
 
 	for _, n := range res {
-		ns = append(ns, NoticeMessage{n})
+		ns = append(ns, NoticeMessage{n, c.User})
 	}
 	return
 }
@@ -97,7 +103,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 // GetNotice gets a specific notice message with the given ID
 func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 	if c == nil {
-		err = TokenNotFoundError
+		err = UserNotFoundError
 		return
 	}
 	defer c.updateToken()
@@ -107,36 +113,30 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 		return
 	}
 
-	n = NoticeMessage{res}
+	n = NoticeMessage{res, c.User}
 	return
 }
 
-// GetNewNotices gets the user's new notice messages
+// GetNewNotices gets the User's new notice messages
 func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
-		err = TokenNotFoundError
+		err = UserNotFoundError
 		return
 	}
 	defer c.updateToken()
-
-	lastState, err := db.GetLastState(c.userID)
-	if err != nil {
-		return
-	}
 
 	res, noticesHash, err := c.Client.GetNoticesWithHash()
 	if err != nil {
 		return
 	}
 
-	if noticesHash == lastState.NoticesHash { // no change at all
+	if noticesHash == c.User.LastNoticesHash { // no change at all
 		return
 	}
 
-	if len(res) == 0 {
-		err = db.PutLastState(c.userID, db.LastState{
-			NoticesHash: noticesHash,
-		})
+	if len(res) == 0 { // no available notices (mostly due to the new semester not started)
+		c.User.LastNoticesHash = noticesHash
+		err = db.PutUser(c.User)
 		return
 	}
 
@@ -144,25 +144,24 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 		return res[i].ModifiedAt.Unix() < res[j].ModifiedAt.Unix()
 	})
 
-	if lastState.NoticesHash != "" && lastState.NoticeTimestamp != 0 { // if not a new user
+	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new User
 		for _, n := range res {
-			if n.ModifiedAt.Unix() > lastState.NoticeTimestamp { // posted or modified later than the last state
-				ns = append(ns, NoticeMessage{n})
+			if n.ModifiedAt.Unix() > c.User.LastNoticeTimestamp { // posted or modified later than the last state
+				ns = append(ns, NoticeMessage{n, c.User})
 			}
 		}
 	}
 
-	err = db.PutLastState(c.userID, db.LastState{
-		NoticesHash:     noticesHash,
-		NoticeTimestamp: res[len(res)-1].ModifiedAt.Unix(),
-	})
+	c.User.LastNoticesHash = noticesHash
+	c.User.LastNoticeTimestamp = res[len(res)-1].ModifiedAt.Unix()
+	err = db.PutUser(c.User)
 	return
 }
 
-// Logout revokes the user's OAuth token and deletes it from the database
+// Logout revokes the User's OAuth token and deletes it from the database
 func (c *Client) Logout() (err error) {
 	if c == nil {
-		err = TokenNotFoundError
+		err = UserNotFoundError
 		return
 	}
 
@@ -171,6 +170,6 @@ func (c *Client) Logout() (err error) {
 		return
 	}
 
-	err = db.DeleteToken(c.userID)
+	err = db.DeleteUser(c.User.ID)
 	return
 }

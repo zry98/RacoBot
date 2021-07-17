@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"RacoBot/internal/locales"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,13 +35,6 @@ type Bot struct {
 	tb.Bot
 }
 
-// predefined reply texts
-const (
-	FIBAPIOAuthAuthorizationExpiredErrorMessage = "Authorization expired, please /login again"
-	InternalErrorMessage                        = "<i>Internal Error</i>"
-	NoNoticesAvailableMessage                   = "<i>No notices available</i>"
-)
-
 // sending options
 var (
 	sendNoticeMessageOption = &tb.SendOptions{ParseMode: tb.ModeHTML, DisableWebPagePreview: true}
@@ -61,7 +55,7 @@ func Init(config BotConfig) {
 	_b, err := tb.NewBot(tb.Settings{
 		Token:       config.Token,
 		Synchronous: true,                             // for webhook mode
-		Verbose:     log.GetLevel() == log.DebugLevel, // for debugging only
+		Verbose:     log.GetLevel() >= log.DebugLevel, // for debugging only
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -130,23 +124,22 @@ func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 		err = next(c)
 		if err != nil {
 			errData, ok := err.(*oauth2.RetrieveError)
-			if err == TokenNotFoundError || err == fibapi.AuthorizationExpiredError ||
+			if err == UserNotFoundError || err == fibapi.AuthorizationExpiredError ||
 				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
 				userID := int64(c.Sender().ID)
 				log.WithField("uid", userID).Info(err)
 
-				err = db.DeleteToken(userID)
-				if err != nil {
+				if err = db.DeleteUser(userID); err != nil {
 					log.Error(err)
 				}
-				return c.Send(FIBAPIOAuthAuthorizationExpiredErrorMessage)
+				return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 			}
 		}
 		return nil
 	}
 }
 
-// sendMessage sends the given message to a Telegram user with the given ID
+// sendMessage sends the given message to a Telegram User with the given ID
 // it's meant to be used inside the package
 func (bot *Bot) sendMessage(userID int64, message interface{}, opt ...interface{}) (*tb.Message, error) {
 	switch m := message.(type) {
@@ -161,7 +154,7 @@ func (bot *Bot) sendMessage(userID int64, message interface{}, opt ...interface{
 	}
 }
 
-// SendMessage sends the given message to a Telegram user with the given ID
+// SendMessage sends the given message to a Telegram User with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) {
 	if _, err := b.sendMessage(userID, message, opt...); err != nil {
@@ -172,7 +165,7 @@ func SendMessage(userID int64, message interface{}, opt ...interface{}) {
 // DeleteLoginLinkMessage deletes the login link message of the given login session
 func DeleteLoginLinkMessage(s db.LoginSession) {
 	err := b.Delete(tb.StoredMessage{
-		MessageID: strconv.FormatInt(s.MessageID, 10),
+		MessageID: strconv.FormatInt(s.LoginLinkMessageID, 10),
 		ChatID:    s.UserID,
 	})
 	if err != nil {
