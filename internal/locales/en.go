@@ -15,4 +15,7 @@ var en = Locale{
 	InternalErrorMessage:                   "<i>Internal error</i>",
 	FIBAPIAuthorizationExpiredErrorMessage: "Authorization expired, please /login again.",
 	LoginLinkMessage:                       "<a href=\"%s\">Authorize Racó Bot</a>",
+	ChoosePreferredLanguageMenuText:        "Please choose your preferred language:",
+	LanguageUnavailableErrorMessage:        "<i>Language unavailable</i>",
+	PreferredLanguageSetMessage:            "The preferred language has been set to English.",
 }

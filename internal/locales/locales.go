@@ -15,6 +15,9 @@ type Locale struct {
 	InternalErrorMessage                   string
 	FIBAPIAuthorizationExpiredErrorMessage string
 	LoginLinkMessage                       string
+	ChoosePreferredLanguageMenuText        string
+	LanguageUnavailableErrorMessage        string
+	PreferredLanguageSetMessage            string
 }
 
 var default_locale *Locale

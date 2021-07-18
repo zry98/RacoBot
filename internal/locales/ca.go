@@ -15,4 +15,7 @@ var ca = Locale{
 	InternalErrorMessage:                   "<i>Error intern</i>",
 	FIBAPIAuthorizationExpiredErrorMessage: "L'autorització ha caducat, si us plau /login per iniciar la sessió de nou.",
 	LoginLinkMessage:                       "<a href=\"%s\">Autoritzar Racó Bot</a>",
+	ChoosePreferredLanguageMenuText:        "Escolliu l'idioma que preferiu:",
+	LanguageUnavailableErrorMessage:        "<i>Idioma no disponible</i>",
+	PreferredLanguageSetMessage:            "L'idioma preferit s'ha configurat a català.",
 }
