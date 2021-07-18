@@ -50,6 +50,10 @@ type BotConfig struct {
 
 var b *Bot
 
+func init() {
+	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonEN, setLanguageButtonES, setLanguageButtonCA))
+}
+
 // Init initializes the bot
 func Init(config BotConfig) {
 	_b, err := tb.NewBot(tb.Settings{
@@ -62,13 +66,19 @@ func Init(config BotConfig) {
 	}
 	b = &Bot{*_b}
 
-	// bind handlers
+	// command handlers
 	b.Handle("/start", start)
 	b.Handle("/login", login)
 	b.Handle("/whoami", middleware(whoami))
 	b.Handle("/logout", middleware(logout))
 	b.Handle("/debug", middleware(debug))
 	b.Handle("/test", middleware(test))
+	b.Handle("/lang", middleware(setPreferredLanguage))
+
+	// inline keyboard button handlers
+	b.Handle(&setLanguageButtonEN, middleware(setPreferredLanguage))
+	b.Handle(&setLanguageButtonES, middleware(setPreferredLanguage))
+	b.Handle(&setLanguageButtonCA, middleware(setPreferredLanguage))
 
 	// update webhook URL
 	err = setWebhook(config.WebhookURL)

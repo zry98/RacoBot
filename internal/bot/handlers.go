@@ -1,8 +1,6 @@
 package bot
 
 import (
-	"RacoBot/internal/ratelimiters"
-	"RacoBot/pkg/fibapi"
 	"sort"
 	"strconv"
 
@@ -11,6 +9,8 @@ import (
 
 	"RacoBot/internal/db"
 	"RacoBot/internal/locales"
+	"RacoBot/internal/ratelimiters"
+	"RacoBot/pkg/fibapi"
 )
 
 // on command `/start`
@@ -141,4 +141,45 @@ func test(c tb.Context) (err error) {
 	}
 
 	return c.Send(NoticeMessage{notices[len(notices)-1], client.User}.String(), sendNoticeMessageOption)
+}
+
+var (
+	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
+	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
+	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
+	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
+)
+
+// on command `/lang`, on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
+// setPreferredLanguage replies the menu of preferred languages for the user to choose from, or sets the user's preferred language with the given callback
+func setPreferredLanguage(c tb.Context) error {
+	if c.Callback() == nil {
+		// on command `/lang`, show menu of languages
+		user, err := db.GetUser(int64(c.Sender().ID))
+		if err != nil {
+			return err
+		}
+
+		return c.Reply(locales.Get(user.LanguageCode).ChoosePreferredLanguageMenuText, setLanguageMenu)
+
+	} else {
+		// on callbacks, set language accordingly
+		languageCode := c.Callback().Unique
+		if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
+			return c.Reply(locales.Get("").InternalErrorMessage)
+		}
+
+		userID := int64(c.Sender().ID)
+		user, err := db.GetUser(userID)
+		if err != nil {
+			return err
+		}
+
+		user.LanguageCode = languageCode
+		if err = db.PutUser(user); err != nil {
+			return err
+		}
+
+		return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
+	}
 }
