@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"RacoBot/internal/locales"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,8 +12,11 @@ import (
 	tb "gopkg.in/tucnak/telebot.v3"
 
 	"RacoBot/internal/db"
+	"RacoBot/internal/locales"
 	"RacoBot/pkg/fibapi"
 )
+
+var b *tb.Bot
 
 // Update represents a Telegram bot Update
 type Update struct {
@@ -29,13 +31,6 @@ func HandleUpdate(u Update) {
 	b.ProcessUpdate(u.Update)
 }
 
-//Bot represents a Telegram bot
-//type Bot struct {
-//	tb.Bot
-//}
-
-var b *tb.Bot
-
 // BotConfig represents a configuration for Telegram bot
 type BotConfig struct {
 	Token      string `toml:"token"`
@@ -43,6 +38,7 @@ type BotConfig struct {
 }
 
 func init() {
+	// initialize set preferred language menu
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonEN, setLanguageButtonES, setLanguageButtonCA))
 }
 

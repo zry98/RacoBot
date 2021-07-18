@@ -45,6 +45,7 @@ type NoticeMessage struct {
 	user db.User
 }
 
+// Send sends a NoticeMessage
 func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
 	params := map[string]string{
 		"chat_id":                  to.Recipient(),
@@ -231,10 +232,12 @@ func byteCountIEC(b int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
+// ErrorMessage represents a message containing error info
 type ErrorMessage struct {
 	Text string
 }
 
+// Send sends an ErrorMessage
 func (m *ErrorMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
 	params := map[string]string{
 		"chat_id":                  to.Recipient(),
@@ -251,10 +254,12 @@ func (m *ErrorMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*t
 	return extractMessage(data)
 }
 
+// SilentMessage represents a message that should be sent with notification disabled
 type SilentMessage struct {
 	Text string
 }
 
+// Send sends a SilentMessage
 func (m *SilentMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
 	params := map[string]string{
 		"chat_id":              to.Recipient(),
@@ -270,10 +275,7 @@ func (m *SilentMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 	return extractMessage(data)
 }
 
-var (
-	ErrTrueResult = errors.New("telebot: result is True")
-)
-
+// copied from telebot to implement Sendable interfaces
 // extractMessage extracts common Message result from given data.
 // Should be called after extractOk or b.Raw() to handle possible errors.
 func extractMessage(data []byte) (*tb.Message, error) {
@@ -288,7 +290,7 @@ func extractMessage(data []byte) (*tb.Message, error) {
 			return nil, errors.Wrap(err, "telebot")
 		}
 		if resp.Result {
-			return nil, ErrTrueResult
+			return nil, errors.New("telebot: result is True")
 		}
 		return nil, errors.Wrap(err, "telebot")
 	}
