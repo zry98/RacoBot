@@ -162,7 +162,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	bot.SendMessage(loginSession.UserID, greetingMessage)
 
 	guideMessage := locales.Get(loginSession.UserLanguageCode).HelpMessage
-	bot.SendMessage(loginSession.UserID, guideMessage, bot.SendSilentMessageOption)
+	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{guideMessage})
 
 	fmt.Fprintln(w, AuthorizedResponseBody)
 }

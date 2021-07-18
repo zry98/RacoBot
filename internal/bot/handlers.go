@@ -45,7 +45,8 @@ func login(c tb.Context) (err error) {
 		return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
 	}
 
-	loginLinkMessage, err := b.sendMessage(userID, LoginLinkMessage{session})
+	loginLinkMessage, err := b.Send(&tb.Chat{ID: userID}, &LoginLinkMessage{session})
+	//loginLinkMessage, err := b.sendMessage(userID, LoginLinkMessage{session})
 	if err != nil {
 		log.Error(err)
 		return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
@@ -99,13 +100,13 @@ func debug(c tb.Context) (err error) {
 	notice, err := client.GetNotice(noticeID)
 	if err == fibapi.NoticeNotFoundError || (err == nil && notice.ID == 0) {
 		// maybe don't exist, or not available to the User
-		return c.Send(locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage, SendHTMLMessageOption)
+		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
 	}
 	if err != nil {
 		return
 	}
 
-	return c.Send(notice.String(), sendNoticeMessageOption)
+	return c.Send(&notice)
 }
 
 // on command `/test`
@@ -127,7 +128,7 @@ func test(c tb.Context) (err error) {
 			return
 		}
 
-		return c.Send(locales.Get(client.User.LanguageCode).NoNoticesAvailableErrorMessage, SendHTMLMessageOption)
+		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoNoticesAvailableErrorMessage})
 	}
 
 	sort.Slice(notices, func(i, j int) bool {
@@ -140,7 +141,7 @@ func test(c tb.Context) (err error) {
 		return
 	}
 
-	return c.Send(NoticeMessage{notices[len(notices)-1], client.User}.String(), sendNoticeMessageOption)
+	return c.Send(&NoticeMessage{notices[len(notices)-1], client.User})
 }
 
 var (

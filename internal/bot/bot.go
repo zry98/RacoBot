@@ -3,7 +3,6 @@ package bot
 import (
 	"RacoBot/internal/locales"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,17 +29,12 @@ func HandleUpdate(u Update) {
 	b.ProcessUpdate(u.Update)
 }
 
-// Bot represents a Telegram bot
-type Bot struct {
-	tb.Bot
-}
+//Bot represents a Telegram bot
+//type Bot struct {
+//	tb.Bot
+//}
 
-// sending options
-var (
-	sendNoticeMessageOption = &tb.SendOptions{ParseMode: tb.ModeHTML, DisableWebPagePreview: true}
-	SendHTMLMessageOption   = &tb.SendOptions{ParseMode: tb.ModeHTML}
-	SendSilentMessageOption = &tb.SendOptions{DisableNotification: true}
-)
+var b *tb.Bot
 
 // BotConfig represents a configuration for Telegram bot
 type BotConfig struct {
@@ -48,15 +42,14 @@ type BotConfig struct {
 	WebhookURL string `toml:"webhook_URL"`
 }
 
-var b *Bot
-
 func init() {
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonEN, setLanguageButtonES, setLanguageButtonCA))
 }
 
 // Init initializes the bot
 func Init(config BotConfig) {
-	_b, err := tb.NewBot(tb.Settings{
+	var err error
+	b, err = tb.NewBot(tb.Settings{
 		Token:       config.Token,
 		Synchronous: true,                             // for webhook mode
 		Verbose:     log.GetLevel() >= log.DebugLevel, // for debugging only
@@ -64,7 +57,6 @@ func Init(config BotConfig) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	b = &Bot{*_b}
 
 	// command handlers
 	b.Handle("/start", start)
@@ -81,8 +73,7 @@ func Init(config BotConfig) {
 	b.Handle(&setLanguageButtonCA, middleware(setPreferredLanguage))
 
 	// update webhook URL
-	err = setWebhook(config.WebhookURL)
-	if err != nil {
+	if err = setWebhook(config.WebhookURL); err != nil {
 		log.Fatal(err)
 		return
 	}
@@ -149,36 +140,20 @@ func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 	}
 }
 
-// sendMessage sends the given message to a Telegram User with the given ID
-// it's meant to be used inside the package
-func (bot *Bot) sendMessage(userID int64, message interface{}, opt ...interface{}) (*tb.Message, error) {
-	switch m := message.(type) {
-	case NoticeMessage:
-		return bot.Send(&tb.Chat{ID: userID}, m.String(), sendNoticeMessageOption)
-	case LoginLinkMessage:
-		return bot.Send(&tb.Chat{ID: userID}, m.String(), SendHTMLMessageOption)
-	case string:
-		return bot.Send(&tb.Chat{ID: userID}, m, opt...)
-	default:
-		return nil, errors.New("message type is not sendable")
-	}
-}
-
 // SendMessage sends the given message to a Telegram User with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) {
-	if _, err := b.sendMessage(userID, message, opt...); err != nil {
+	if _, err := b.Send(&tb.Chat{ID: userID}, message, opt...); err != nil {
 		log.Error(err)
 	}
 }
 
 // DeleteLoginLinkMessage deletes the login link message of the given login session
 func DeleteLoginLinkMessage(s db.LoginSession) {
-	err := b.Delete(tb.StoredMessage{
+	if err := b.Delete(tb.StoredMessage{
 		MessageID: strconv.FormatInt(s.LoginLinkMessageID, 10),
 		ChatID:    s.UserID,
-	})
-	if err != nil {
+	}); err != nil {
 		log.Error(err)
 	}
 }
