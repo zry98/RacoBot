@@ -6,7 +6,7 @@ route = "raco-bot.example.com/*"
 zone_id = ""
 webpack_config = "webpack.config.js"
 kv_namespaces = [
-         { binding = "KV", id = "" }
+    { binding = "KV", id = "" }
 ]
 
 [vars]
@@ -15,4 +15,5 @@ FIBAPI_OAUTH_CLIENT_ID = ""
 USER_ID = ""
 
 [triggers]
-crons = ["*/15 * * * *"]
+# BE CAREFUL with the cron expressions
+crons = ["*/15 7-23 * * 1-5"]  # runs every 15 minutes during 07:00-23:00 on every weekday

@@ -1,5 +1,5 @@
-import {Bot} from './bot'
-import {AUTHORIZED_HTML} from './constants'
+import { Bot } from './bot'
+import { AUTHORIZED_HTML } from './constants'
 
 const bot = Bot(TELEGRAM_BOT_API_TOKEN)
 
@@ -27,9 +27,7 @@ async function handleRequest(request) {
     await bot.authorize(authorizationCode)
 
     return new Response(AUTHORIZED_HTML, {
-      headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
-      },
+      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     })
   }
 

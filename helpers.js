@@ -1,92 +1,114 @@
-import {decode} from 'html-entities'  // for un-escaping HTML entities like `&#39;` since HTMLRewriter can't do that
-import {FIBAPI_BASE_URL} from './constants'
+import { decode } from 'html-entities'  // for un-escaping HTML entities like `&#39;` since HTMLRewriter can't do that
+import { FIBAPI_BASE_URL, FIBAPI_ACCESS_TOKEN_KEY_NAME, FIBAPI_REFRESH_TOKEN_KEY_NAME } from './constants'
 
-// builds notice message for Telegram from HTML in FIB API response
-async function buildNoticeMessage(subjectCode, title, text) {
-  const supportedTags = ['a', 'b', 'i', 'u', 's', 'code', 'pre']
+// buildNoticeMessage formats a notice to a proper string ready to be sent by bot
+async function buildNoticeMessage(notice) {
+  const supportedTagNames = ['a', 'b', 'strong', 'i', 'em', 'u', 'ins', 's', 'strike', 'del', 'code', 'pre']
+  const messageMaxLength = 4096
 
-  class UserElementHandler {
-    element(element) {
-      if (element.tagName === 'br') {
+  class ElementContentHandler {
+    element(e) {
+      if (e.tagName === 'br') {
         // Telegram doesn't support <br> but \n
-        element.replace('\n')
-      } else if (element.tagName === 'span' && element.getAttribute('class') === 'label') {
+        e.replace('\n')
+      } else if (e.tagName === 'li') {
+        // Telegram doesn't support <ul> & <li>, so add a `- ` at the beginning as an indicator
+        e.before('- ')
+        e.after('\n')  // newline after each entry
+      } else if (e.tagName === 'div' && e.getAttribute('class') === 'extraInfo') {
+        // add newlines before exam info titles
+        e.before('\n')
+      } else if (e.tagName === 'span' && e.getAttribute('id') === 'horaExamen') {
+        // add newlines after exam time data
+        e.after('\n')
+      } else if (e.tagName === 'span' && e.getAttribute('class') === 'label') {
         // italicize info titles
-        element.tagName = 'i'
-        element.removeAttribute('class')
-        element.prepend('- ')
-      } else if (element.tagName === 'div' && element.getAttribute('class') === 'extraInfo') {
-        // add newlines before exam info titles  // TODO: check if notice 117170 has a typo of newline in aulesExamen
-        element.before('\n')
+        e.tagName = 'i'
+        e.removeAttribute('class')
+        e.prepend('- ')
+      } else if (e.tagName === 'span' && e.getAttribute('style') === 'text-decoration:underline') {
+        // underlines
+        e.tagName = 'u'
+        e.removeAttribute('style')
       }
-      if (!supportedTags.includes(element.tagName)) {
+      if (!supportedTagNames.includes(e.tagName)) {
         // strip all the other tags since Telegram doesn't support them
-        element.removeAndKeepContent()
+        e.removeAndKeepContent()
       }
     }
   }
 
-  let msg = new HTMLRewriter().
-      // TODO: use multiple handlers instead of matching all tags in one?
-      // on('div[class="examen"] > div[class="extraInfo"] > *', new ExtraInfoElementHandler()).
-      on('*', new UserElementHandler()).
-      transform(new Response(text))
-  msg = decode(await (msg.text()))
+  let result = ''
+  if (notice.text !== '') {
+    result = '\n\n' + decode(await ((new HTMLRewriter().on('*', new ElementContentHandler()).transform(new Response(notice.text))).text()))
+  }
+  result = `[${notice.codi_assig}] <b>${notice.titol}</b>${result}`
 
-  return `[${subjectCode}] <b>${title}</b>\n\n${msg}`
+  if (result.length > messageMaxLength) {
+    result = `[${notice.codi_assig}] <b>${notice.titol}</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href="https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-${notice.codi_assig}&id=${notice.id}">this link</a>.`
+  }
+
+  return result
 }
 
-// requests access token from FIB API with authorization code or refresh token
-async function authorize(authorizationCode = null, refreshToken = null) {
-  let reqBody
-  if (authorizationCode !== null && refreshToken === null) {  // first time authorization using authorization_code
-    reqBody = new URLSearchParams({
+// authorize requests access token from FIB API with authorization code
+async function authorize(authorizationCode) {
+  const data = await (await fetch(`${FIBAPI_BASE_URL}/o/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       'grant_type': 'authorization_code',
-      'redirect_uri': FIBAPI_REDIRECT_URI,
       'code': authorizationCode,
+      'redirect_uri': FIBAPI_REDIRECT_URI,
       'client_id': FIBAPI_OAUTH_CLIENT_ID,
       'client_secret': FIBAPI_OAUTH_CLIENT_SECRET,
-    })
-  } else if (authorizationCode === null && refreshToken !== null) {  // refresh authorization using refresh_token
-    reqBody = new URLSearchParams({
+    }),
+  })).json()
+  if (!data || !data.access_token || data.access_token.length !== 30
+    || !data.refresh_token || data.refresh_token.length !== 30) {
+    throw new Error('[FIB API] Invalid OAuth authorizing response')
+  }
+
+  await KV.put(FIBAPI_ACCESS_TOKEN_KEY_NAME, data.access_token, { expirationTtl: 36000 - 30 })
+  await KV.put(FIBAPI_REFRESH_TOKEN_KEY_NAME, data.refresh_token)
+
+  return data.access_token
+}
+
+// refreshAuthorization refreshes the access token and refresh token from FIB API with refresh token
+async function refreshAuthorization(refreshToken) {
+  const data = await (await fetch(`${FIBAPI_BASE_URL}/o/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       'grant_type': 'refresh_token',
       'refresh_token': refreshToken,
       'client_id': FIBAPI_OAUTH_CLIENT_ID,
       'client_secret': FIBAPI_OAUTH_CLIENT_SECRET,
-    })
-  } else {
-    throw new Error('[FIB API] Wrong authorization request parameters')
-  }
-
-  const data = await (await fetch(`${FIBAPI_BASE_URL}/o/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: reqBody,
+    }),
   })).json()
   if (!data || !data.access_token || data.access_token.length !== 30
-      || !data.refresh_token || data.refresh_token.length !== 30) {
-    throw new Error('[FIB API] Invalid OAuth token response')
+    || !data.refresh_token || data.refresh_token.length !== 30) {
+    throw new Error('[FIB API] Invalid OAuth refreshing response')
   }
 
-  await KV.put('fibapi.access_token', data.access_token, {expirationTtl: 36000})
-  await KV.put('fibapi.refresh_token', data.refresh_token)
+  await KV.put(FIBAPI_ACCESS_TOKEN_KEY_NAME, data.access_token, { expirationTtl: 36000 - 30 })
+  await KV.put(FIBAPI_REFRESH_TOKEN_KEY_NAME, data.refresh_token)
 
   return data.access_token
 }
 
 // gets FIB API access token from KV, and requests a new one when expired
 async function getAccessToken() {
-  let accessToken = await KV.get('fibapi.access_token')
-  while (!accessToken || accessToken.length !== 30) {
-    let refreshToken = await KV.get('fibapi.refresh_token')
+  let accessToken = await KV.get(FIBAPI_ACCESS_TOKEN_KEY_NAME)
+  if (!accessToken || accessToken.length !== 30) {
+    const refreshToken = await KV.get(FIBAPI_REFRESH_TOKEN_KEY_NAME)
     if (!refreshToken || refreshToken.length !== 30) {
       throw new Error('Invalid FIBAPI.ACCESS_TOKEN and FIBAPI.REFRESH_TOKEN in KV')
     }
-    accessToken = await authorize(null, refreshToken)
+    accessToken = await refreshAuthorization(refreshToken)
   }
   return accessToken
 }
 
-export {buildNoticeMessage, authorize, getAccessToken}
+export { buildNoticeMessage, authorize, getAccessToken }
