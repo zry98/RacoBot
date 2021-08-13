@@ -16,4 +16,4 @@ USER_ID = ""
 
 [triggers]
 # BE CAREFUL with the cron expressions
-crons = ["*/15 7-23 * * 1-5"]  # runs every 15 minutes during 07:00-23:00 on every weekday
+crons = ["*/15 7-23 * * 2-6"]  # runs every 15 minutes during 07:00-23:00 on every weekday
