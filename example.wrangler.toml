@@ -10,9 +10,10 @@ kv_namespaces = [
 ]
 
 [vars]
-FIBAPI_REDIRECT_URI = "https://raco-bot.example.com/oauth/"
+TELEGRAM_BOT_USER_ID = ""
+TELEGRAM_BOT_WEBHOOK_PATH = "bot"
+FIBAPI_REDIRECT_URI = "https://raco-bot.example.com/oauth"
 FIBAPI_OAUTH_CLIENT_ID = ""
-USER_ID = ""
 
 [triggers]
 # BE CAREFUL with the cron expressions

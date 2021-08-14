@@ -1,5 +1,5 @@
 import { decode } from 'html-entities'  // for un-escaping HTML entities like `&#39;` since HTMLRewriter can't do that
-import { FIBAPI_BASE_URL, FIBAPI_ACCESS_TOKEN_KEY_NAME, FIBAPI_REFRESH_TOKEN_KEY_NAME } from './constants'
+import { FIBAPILoginRedirectBaseURL } from './constants'
 
 // buildNoticeMessage formats a notice to a proper string ready to be sent by bot
 async function buildNoticeMessage(notice) {
@@ -44,71 +44,68 @@ async function buildNoticeMessage(notice) {
   }
   result = `[${notice.codi_assig}] <b>${notice.titol}</b>${result}`
 
+  // attachments
+  if (notice.adjunts.length > 0) {
+    let sb = ''
+    for (const attachment of notice.adjunts) {
+      const fileSize = byteCountIEC(attachment.mida)
+      const redirectURL = FIBAPILoginRedirectBaseURL + encodeURIComponent(attachment.url)
+      sb += `<a href="${redirectURL}">${attachment.nom}</a>  (${fileSize})\n`
+    }
+    const noun = notice.adjunts.length > 1 ? 'attachments' : 'attachment'
+    result = `${result}\n\n<i>- With ${notice.adjunts.length} ${noun}:</i>\n${sb}`
+  }
+
   if (result.length > messageMaxLength) {
+    // send Racó notice URL instead if message length exceeds the limit of 4096 characters
     result = `[${notice.codi_assig}] <b>${notice.titol}</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href="https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-${notice.codi_assig}&id=${notice.id}">this link</a>.`
   }
 
   return result
 }
 
-// authorize requests access token from FIB API with authorization code
-async function authorize(authorizationCode) {
-  const data = await (await fetch(`${FIBAPI_BASE_URL}/o/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      'grant_type': 'authorization_code',
-      'code': authorizationCode,
-      'redirect_uri': FIBAPI_REDIRECT_URI,
-      'client_id': FIBAPI_OAUTH_CLIENT_ID,
-      'client_secret': FIBAPI_OAUTH_CLIENT_SECRET,
-    }),
-  })).json()
-  if (!data || !data.access_token || data.access_token.length !== 30
-    || !data.refresh_token || data.refresh_token.length !== 30) {
-    throw new Error('[FIB API] Invalid OAuth authorizing response')
+// byteCountIEC returns the human-readable file size of the given bytes count
+function byteCountIEC(b) {
+  const unit = 1024
+  if (b < unit) {
+    return `${b} B`
   }
-
-  await KV.put(FIBAPI_ACCESS_TOKEN_KEY_NAME, data.access_token, { expirationTtl: 36000 - 30 })
-  await KV.put(FIBAPI_REFRESH_TOKEN_KEY_NAME, data.refresh_token)
-
-  return data.access_token
+  let div = unit, exp = 0
+  for (let n = b / unit; n >= unit; n /= unit) {
+    div *= unit
+    exp++
+  }
+  return `${(b / div).toFixed(1)} ${'KMGTPE'[exp]}iB`
 }
 
-// refreshAuthorization refreshes the access token and refresh token from FIB API with refresh token
-async function refreshAuthorization(refreshToken) {
-  const data = await (await fetch(`${FIBAPI_BASE_URL}/o/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      'grant_type': 'refresh_token',
-      'refresh_token': refreshToken,
-      'client_id': FIBAPI_OAUTH_CLIENT_ID,
-      'client_secret': FIBAPI_OAUTH_CLIENT_SECRET,
-    }),
-  })).json()
-  if (!data || !data.access_token || data.access_token.length !== 30
-    || !data.refresh_token || data.refresh_token.length !== 30) {
-    throw new Error('[FIB API] Invalid OAuth refreshing response')
-  }
-
-  await KV.put(FIBAPI_ACCESS_TOKEN_KEY_NAME, data.access_token, { expirationTtl: 36000 - 30 })
-  await KV.put(FIBAPI_REFRESH_TOKEN_KEY_NAME, data.refresh_token)
-
-  return data.access_token
+// getHash returns the base64 encoded SHA-256 hash of the given data
+async function getHash(data) {
+  const encoder = new TextEncoder()
+  // return Array.from(new Uint8Array(
+  //   await crypto.subtle.digest('SHA-256', encoder.encode(data)))
+  // ).map(b => b.toString(16).padStart(2, '0')).join('')
+  return btoa(String.fromCharCode(...new Uint8Array(
+    await crypto.subtle.digest('SHA-256', encoder.encode(data))
+  )))
 }
 
-// gets FIB API access token from KV, and requests a new one when expired
-async function getAccessToken() {
-  let accessToken = await KV.get(FIBAPI_ACCESS_TOKEN_KEY_NAME)
-  if (!accessToken || accessToken.length !== 30) {
-    const refreshToken = await KV.get(FIBAPI_REFRESH_TOKEN_KEY_NAME)
-    if (!refreshToken || refreshToken.length !== 30) {
-      throw new Error('Invalid FIBAPI.ACCESS_TOKEN and FIBAPI.REFRESH_TOKEN in KV')
-    }
-    accessToken = await refreshAuthorization(refreshToken)
+// timingSafeEqual compares the given two payloads in a timing-safe manner
+function timingSafeEqual(a, b) {
+  const strA = String(a)
+  let strB = String(b)
+  const lenA = strA.length
+  let result = 0
+
+  if (lenA !== strB.length) {
+    strB = strA
+    result = 1
   }
-  return accessToken
+
+  for (let i = 0; i < lenA; i++) {
+    result |= (strA.charCodeAt(i) ^ strB.charCodeAt(i))
+  }
+
+  return result === 0
 }
 
-export { buildNoticeMessage, authorize, getAccessToken }
+export { buildNoticeMessage, getHash, timingSafeEqual }

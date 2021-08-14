@@ -1,7 +1,14 @@
 import { Bot } from './bot'
-import { AUTHORIZED_HTML } from './constants'
+import {
+  TelegramBotAPIToken,
+  AuthorizedHTML,
+  TelegramBotWebhookPath,
+  BotUserID,
+  FIBAPIOAuthRedirectURLPath
+} from './constants'
+import { getHash, timingSafeEqual } from './helpers'
 
-const bot = Bot(TELEGRAM_BOT_API_TOKEN)
+const bot = Bot(TelegramBotAPIToken)
 
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request).then(resp => {
@@ -14,19 +21,21 @@ addEventListener('fetch', event => {
 
 async function handleRequest(request) {
   const url = new URL(request.url)
-  if (request.method === 'POST' && url.pathname === '/bot') {  // Telegram update
+  if (request.method === 'POST' && url.pathname === TelegramBotWebhookPath) {  // Telegram update
     await bot.handleUpdate(await request.json())
     return new Response('OK')
 
-  } else if (request.method === 'GET' && url.pathname.startsWith('/o/authorize')) {  // FIB API OAuth callback
-    const authorizationCode = url.searchParams.get('code')
-    if (!authorizationCode || authorizationCode.length !== 30) {
-      throw new Error('[FIB API] Invalid OAuth callback request')
+  } else if (request.method === 'GET' && url.pathname.startsWith(FIBAPIOAuthRedirectURLPath)) {  // FIB API OAuth callback
+    const code = url.searchParams.get('code')
+    const state = url.searchParams.get('state')
+    if (!code || !state || code.length !== 30
+      || !timingSafeEqual(state, await getHash(BotUserID.toString()))) {
+      throw new Error('Invalid OAuth callback request')
     }
 
-    await bot.authorize(authorizationCode)
+    await bot.authorize(code)
 
-    return new Response(AUTHORIZED_HTML, {
+    return new Response(AuthorizedHTML, {
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     })
   }
