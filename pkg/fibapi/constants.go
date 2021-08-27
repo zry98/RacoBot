@@ -22,7 +22,7 @@ const (
 )
 
 // the response text of an OAuth get token request when the Authorization Code is invalid
-const OAuthInvalidAuthorizationCodeResponse = "{\"error\": \"invalid_grant\"}"
+const OAuthInvalidAuthorizationCodeResponse = `{"error": "invalid_grant"}`
 
 // errors
 var (

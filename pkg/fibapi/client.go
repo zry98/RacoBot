@@ -134,7 +134,7 @@ func (c *Client) GetAttachmentFileData(a Attachment) (data io.Reader, err error)
 	return
 }
 
-// request requests to FIB API with the given URL
+// request makes a request to FIB API with the given method and URL
 func (c *Client) request(method, URL string) (body []byte, header http.Header, err error) {
 	req, err := http.NewRequest(method, URL, nil)
 	if err != nil {

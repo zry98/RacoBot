@@ -3,6 +3,7 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"strings"
 
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
@@ -138,7 +139,7 @@ func (m *NoticeMessage) String() (result string) {
 					},
 					{
 						Selector: "br",
-						// Telegram doesn't support <br> but \m
+						// Telegram doesn't support <br> but \n
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							err := e.ReplaceAsText("\n")
 							if err != nil {
@@ -186,7 +187,7 @@ func (m *NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", m.ID)
 		}
-		result = "\n\n" + result
+		result = "\n\n" + html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
 	// TODO: use template
