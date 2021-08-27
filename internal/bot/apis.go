@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -146,7 +147,8 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 
 	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new User
 		for _, n := range res {
-			if n.ModifiedAt.Unix() > c.User.LastNoticeTimestamp { // posted or modified later than the last state
+			if n.ModifiedAt.Unix() > c.User.LastNoticeTimestamp ||
+				(strings.HasPrefix(n.SubjectCode, "#") && n.ModifiedAt.Unix() < n.CreatedAt.Unix() && n.CreatedAt.Unix() > c.User.LastNoticeTimestamp) { // TODO: check for bugs
 				ns = append(ns, NoticeMessage{n, c.User})
 			}
 		}
