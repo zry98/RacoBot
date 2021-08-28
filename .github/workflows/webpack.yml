@@ -24,6 +24,6 @@ jobs:
 
     - name: Build
       run: |
-        npm install -D webpack webpack-cli
+        npm install -D webpack@4.44.2 webpack-cli
         npm install
         npx webpack
