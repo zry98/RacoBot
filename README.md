@@ -1,5 +1,7 @@
 # Racó Bot
 
+![workflow-webpack](https://github.com/zry98/RacoBot/actions/workflows/webpack.yml/badge.svg)
+
 A Telegram Bot designed to run on Cloudflare Workers® for forwarding notices from [*El Racó de la FIB*](https://raco.fib.upc.edu/).
 
 ## Disclaimer
