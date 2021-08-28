@@ -1,5 +1,4 @@
 import { decode } from 'html-entities'  // for un-escaping HTML entities like `&#39;` since HTMLRewriter can't do that
-import { FIBAPILoginRedirectBaseURL } from './constants'
 
 // buildNoticeMessage formats a notice to a proper string ready to be sent by bot
 async function buildNoticeMessage(notice) {
@@ -40,25 +39,25 @@ async function buildNoticeMessage(notice) {
 
   let result = ''
   if (notice.text !== '') {
-    result = '\n\n' + decode(await ((new HTMLRewriter().on('*', new ElementContentHandler()).transform(new Response(notice.text))).text()))
+    result = await ((new HTMLRewriter().on('*', new ElementContentHandler()).transform(new Response(notice.text))).text())
+    result = '\n\n' + decode(result)
   }
-  result = `[${notice.codi_assig}] <b>${notice.titol}</b>${result}`
+  result = `[${notice.subjectCode}] <b>${notice.title}</b>${result}`
 
   // attachments
-  if (notice.adjunts.length > 0) {
+  if (notice.attachments.length > 0) {
     let sb = ''
-    for (const attachment of notice.adjunts) {
-      const fileSize = byteCountIEC(attachment.mida)
-      const redirectURL = FIBAPILoginRedirectBaseURL + encodeURIComponent(attachment.url)
-      sb += `<a href="${redirectURL}">${attachment.nom}</a>  (${fileSize})\n`
+    for (const attachment of notice.attachments) {
+      const fileSize = byteCountIEC(attachment.size)
+      sb += `<a href="${attachment.redirectURL}">${attachment.name}</a>  (${fileSize})\n`
     }
-    const noun = notice.adjunts.length > 1 ? 'attachments' : 'attachment'
-    result = `${result}\n\n<i>- With ${notice.adjunts.length} ${noun}:</i>\n${sb}`
+    const noun = notice.attachments.length > 1 ? 'attachments' : 'attachment'
+    result = `${result}\n\n<i>- With ${notice.attachments.length} ${noun}:</i>\n${sb}`
   }
 
   if (result.length > messageMaxLength) {
     // send Racó notice URL instead if message length exceeds the limit of 4096 characters
-    result = `[${notice.codi_assig}] <b>${notice.titol}</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href="https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-${notice.codi_assig}&id=${notice.id}">this link</a>.`
+    result = `[${notice.subjectCode}] <b>${notice.title}</b>\n\nSorry, but this message is too long to be sent through Telegram, please view it through <a href="https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-${notice.subjectCode}&id=${notice.id}">this link</a>.`
   }
 
   return result

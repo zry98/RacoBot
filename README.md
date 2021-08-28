@@ -1,7 +1,10 @@
-# RacóBot
+# Racó Bot
 
-A Telegram bot designed to run on [Cloudflare Workers](https://workers.cloudflare.com/) for forwarding notifications
-from [*El Racó*](https://raco.fib.upc.edu/).
+A Telegram Bot designed to run on Cloudflare Workers® for forwarding notices from [*El Racó de la FIB*](https://raco.fib.upc.edu/).
+
+## Disclaimer
+
+This project is unofficial and not associated with *El Racó* nor *La FIB (Facultat d'Informàtica de Barcelona)*.
 
 ## Requirements
 
