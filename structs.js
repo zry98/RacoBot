@@ -11,7 +11,7 @@ function UserInfo(o) {
   return {
     username: o.username,
     firstName: o.nom,
-    lastNames: o.cognoms
+    lastNames: o.cognoms,
   }
 }
 
@@ -33,13 +33,15 @@ function Notice(o) {
       throw new Error('[FIB API] Invalid Notice')
     }
   }
+  const createdAt = Date.parse(o.data_insercio), modifiedAt = Date.parse(o.data_modificacio)
   return {
     id: o.id,
     title: o.titol,
     subjectCode: o.codi_assig,
     text: o.text,
-    createdAt: Date.parse(o.data_insercio),
-    modifiedAt: Date.parse(o.data_modificacio),
+    createdAt: createdAt,
+    modifiedAt: modifiedAt,
+    publishedAt: modifiedAt < createdAt ? createdAt : modifiedAt,
     expiresAt: Date.parse(o.data_caducitat),
     attachments: o.adjunts.map(attachment => new Attachment(attachment)),
   }

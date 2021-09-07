@@ -44,20 +44,16 @@ function Bot(token) {
       return
     }
 
+    notices.sort((i, j) => i.publishedAt - j.publishedAt)
+
     const lastNoticeTimestamp = parseInt(await KV.get(LastNoticeTimestampKeyName))
-    let newLastNoticeTimestamp = lastNoticeTimestamp
     for (const notice of notices) {
-      if (notice.modifiedAt > lastNoticeTimestamp || notice.createdAt > lastNoticeTimestamp) {
-        if (notice.modifiedAt > notice.createdAt && notice.modifiedAt > newLastNoticeTimestamp) {
-          newLastNoticeTimestamp = notice.modifiedAt
-        } else if (notice.createdAt > notice.modifiedAt && notice.createdAt > newLastNoticeTimestamp) {
-          newLastNoticeTimestamp = notice.createdAt
-        }
+      if (notice.publishedAt > lastNoticeTimestamp) {
         const msg = await buildNoticeMessage(notice)
         await bot.telegram.sendMessage(BotUserID, msg, { parse_mode: 'HTML' })
       }
     }
-    await KV.put(LastNoticeTimestampKeyName, newLastNoticeTimestamp.toString())
+    await KV.put(LastNoticeTimestampKeyName, notices[notices.length - 1].publishedAt.toString())
   }
 
   // starts PM session
