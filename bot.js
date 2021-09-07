@@ -6,7 +6,7 @@ import {
   RefreshTokenKeyName,
   LastNoticeTimestampKeyName,
   NoticeUnavailableErrorMessage,
-  NoNoticesAvailableErrorMessage,
+  NoAvailableNoticesErrorMessage,
 } from './constants'
 import { buildNoticeMessage, getHash } from './helpers'
 import { Notices, UserInfo } from './structs'
@@ -40,16 +40,18 @@ function Bot(token) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     })).json())
     if (notices.length === 0) {
-      await bot.telegram.sendMessage(BotUserID, NoNoticesAvailableErrorMessage, { parse_mode: 'HTML' })
+      await bot.telegram.sendMessage(BotUserID, NoAvailableNoticesErrorMessage, { parse_mode: 'HTML' })
       return
     }
 
     const lastNoticeTimestamp = parseInt(await KV.get(LastNoticeTimestampKeyName))
     let newLastNoticeTimestamp = lastNoticeTimestamp
     for (const notice of notices) {
-      if (notice.modifiedAt > lastNoticeTimestamp) {
-        if (notice.modifiedAt > newLastNoticeTimestamp) {
+      if (notice.modifiedAt > lastNoticeTimestamp || notice.createdAt > lastNoticeTimestamp) {
+        if (notice.modifiedAt > notice.createdAt && notice.modifiedAt > newLastNoticeTimestamp) {
           newLastNoticeTimestamp = notice.modifiedAt
+        } else if (notice.createdAt > notice.modifiedAt && notice.createdAt > newLastNoticeTimestamp) {
+          newLastNoticeTimestamp = notice.createdAt
         }
         const msg = await buildNoticeMessage(notice)
         await bot.telegram.sendMessage(BotUserID, msg, { parse_mode: 'HTML' })
@@ -85,7 +87,7 @@ function Bot(token) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     })).json())
     if (notices.length === 0) {
-      await ctx.replyWithHTML(NoNoticesAvailableErrorMessage)
+      await ctx.replyWithHTML(NoAvailableNoticesErrorMessage)
       return
     }
 
@@ -101,6 +103,7 @@ function Bot(token) {
     await ctx.replyWithHTML(NoticeUnavailableErrorMessage)
   })
 
+  // (for notices debugging only)
   bot.command('test', async (ctx) => {
     await bot.pushNewNotices()
   })

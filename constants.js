@@ -3,7 +3,7 @@ const FIBAPILoginRedirectBaseURL = 'https://api.fib.upc.edu/v2/accounts/login/?n
 const AuthorizedHTML = `<!DOCTYPE html>
 <body>
   <h1>Authorized</h1>
-</body>`
+</body>` // TODO: make it nicer
 
 const LastNoticeTimestampKeyName = 'last_notice_timestamp'
 const AccessTokenKeyName = 'fibapi.access_token'
@@ -15,7 +15,7 @@ const BotUserID = parseInt(TELEGRAM_BOT_USER_ID)
 const FIBAPIOAuthRedirectURLPath = (new URL(FIBAPI_REDIRECT_URI)).pathname
 
 const NoticeUnavailableErrorMessage = '<i>Notice unavailable</i>'
-const NoNoticesAvailableErrorMessage = '<i>No notices available</i>'
+const NoAvailableNoticesErrorMessage = '<i>No available notices</i>'
 
 export {
   FIBAPIBaseURL,
@@ -29,5 +29,5 @@ export {
   BotUserID,
   FIBAPIOAuthRedirectURLPath,
   NoticeUnavailableErrorMessage,
-  NoNoticesAvailableErrorMessage
+  NoAvailableNoticesErrorMessage
 }

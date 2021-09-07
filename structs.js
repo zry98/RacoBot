@@ -1,7 +1,7 @@
 import { FIBAPILoginRedirectBaseURL } from './constants'
 
 // UserInfo represents a user's information API response
-// Endpoint: /jo
+// Endpoint: /jo.json
 function UserInfo(o) {
   for (const field of ['nom', 'cognoms', 'email']) {
     if (!(field in o)) {
@@ -13,6 +13,17 @@ function UserInfo(o) {
     firstName: o.nom,
     lastNames: o.cognoms
   }
+}
+
+// Notices represents a user's notices API response
+// Endpoint: /jo/avisos.json
+function Notices(o) {
+  for (const field of ['count', 'results']) {
+    if (!(field in o)) {
+      throw new Error('[FIB API] Invalid Notices response')
+    }
+  }
+  return o.results.map(notice => new Notice(notice))
 }
 
 // Notice represents a single notice in a NoticesResponse API response
@@ -53,15 +64,33 @@ function Attachment(o) {
   }
 }
 
-// Notices represents a user's notices API response
-// Endpoint: /jo/avisos
-function Notices(o) {
+// Schedule represents a user's schedule API response
+// Endpoint: /jo/classes.json
+function Schedule(o) {
   for (const field of ['count', 'results']) {
     if (!(field in o)) {
-      throw new Error('[FIB API] Invalid Notices response')
+      throw new Error('[FIB API] Invalid Schedule response')
     }
   }
-  return o.results.map(notice => new Notice(notice))
+  return o.results.map(class_ => new Class(class_))
 }
 
-export { UserInfo, Notices }
+// Class represents a single class in a ScheduleResponse API response
+function Class(o) {
+  for (const field of ['codi_assig', 'grup', 'dia_setmana', 'inici', 'durada', 'tipus', 'aules']) {
+    if (!(field in o)) {
+      throw new Error('[FIB API] Invalid Class')
+    }
+  }
+  return {
+    subjectCode: o.codi_assig,
+    group: o.grup,
+    dayOfWeek: parseInt(o.dia_setmana),
+    startTime: o.inici,
+    duration: parseInt(o.durada),
+    types: o.tipus,
+    classrooms: o.aules,
+  }
+}
+
+export { UserInfo, Notices, Schedule }
