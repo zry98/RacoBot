@@ -3,10 +3,10 @@ name: Run Tests
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   lint:
@@ -26,13 +26,11 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        go: [ 1.13, 1.14, 1.15, 1.16, 1.17 ]
+        os: [ ubuntu-latest ]
+        go: [ 1.15, 1.16, 1.17 ]
         include:
           - os: ubuntu-latest
             go-build: ~/.cache/go-build
-          - os: macos-latest
-            go-build: ~/Library/Caches/go-build
     name: ${{ matrix.os }} @ Go ${{ matrix.go }}
     runs-on: ${{ matrix.os }}
     env:
