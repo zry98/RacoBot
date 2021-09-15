@@ -128,7 +128,7 @@ func test(c tb.Context) (err error) {
 			return
 		}
 
-		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoNoticesAvailableErrorMessage})
+		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoAvailableNoticesErrorMessage})
 	}
 
 	sort.Slice(notices, func(i, j int) bool {

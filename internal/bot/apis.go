@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -142,20 +141,19 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	}
 
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].ModifiedAt.Unix() < res[j].ModifiedAt.Unix()
+		return res[i].PublishedAt().Unix() < res[j].PublishedAt().Unix()
 	})
 
-	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new User
+	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
 		for _, n := range res {
-			if n.ModifiedAt.Unix() > c.User.LastNoticeTimestamp ||
-				(strings.HasPrefix(n.SubjectCode, "#") && n.ModifiedAt.Unix() < n.CreatedAt.Unix() && n.CreatedAt.Unix() > c.User.LastNoticeTimestamp) { // TODO: check for bugs
+			if n.PublishedAt().Unix() > c.User.LastNoticeTimestamp {
 				ns = append(ns, NoticeMessage{n, c.User})
 			}
 		}
 	}
 
 	c.User.LastNoticesHash = noticesHash
-	c.User.LastNoticeTimestamp = res[len(res)-1].ModifiedAt.Unix()
+	c.User.LastNoticeTimestamp = res[len(res)-1].PublishedAt().Unix()
 	err = db.PutUser(c.User)
 	return
 }

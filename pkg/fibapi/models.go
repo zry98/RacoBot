@@ -1,6 +1,7 @@
 package fibapi
 
 import (
+	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -8,11 +9,18 @@ import (
 )
 
 // UserInfo represents a user's information API response
-// Endpoint: /jo
+// Endpoint: /jo.json
 type UserInfo struct {
 	Username  string `json:"username"`
 	FirstName string `json:"nom"`
 	LastNames string `json:"cognoms"`
+}
+
+// NoticesResponse represents a user's notices API response
+// Endpoint: /jo/avisos.json
+type NoticesResponse struct {
+	Count   int      `json:"count"`
+	Results []Notice `json:"results"`
 }
 
 // Notice represents a single notice in a NoticesResponse API response
@@ -25,51 +33,18 @@ type Notice struct {
 	ModifiedAt  TimeDate     `json:"data_modificacio"`
 	ExpiresAt   TimeDate     `json:"data_caducitat"`
 	Attachments []Attachment `json:"adjunts"`
+	PublishedAt TimeDate
 }
 
-// NoticesResponse represents a user's notices API response
-// Endpoint: /jo/avisos
-type NoticesResponse struct {
-	Count   int      `json:"count"`
-	Results []Notice `json:"results"`
-}
-
-// Class represents a single class in a ScheduleResponse API response
-type Class struct {
-	SubjectCode string `json:"codi_assig"`
-	Group       string `json:"grup"`
-	DayOfWeek   int    `json:"dia_setmana"`
-	StartTime   string `json:"inici"`
-	Duration    int    `json:"durada"`
-	Types       string `json:"tipus"`
-	Classrooms  string `json:"aules"`
-}
-
-// ScheduleResponse represents a user's schedule API response
-// Endpoint: /jo/classes
-type ScheduleResponse struct {
-	Count   int     `json:"count"`
-	Results []Class `json:"results"`
-}
-
-// Subject represents a single subject in a SubjectsResponse API response
-type Subject struct {
-	ID       string  `json:"id"`
-	URL      string  `json:"url"`
-	GuideURL string  `json:"guia"`
-	Group    string  `json:"grup"`
-	Acronym  string  `json:"sigles"`
-	UPCCode  int     `json:"codi_upc"`
-	Semester string  `json:"semestre"`
-	Credits  float32 `json:"credits"`
-	Name     string  `json:"nom"`
-}
-
-// SubjectsResponse represents a user's subjects API response
-// Endpoint: /jo/assignatures
-type SubjectsResponse struct {
-	Count   int       `json:"count"`
-	Results []Subject `json:"results"`
+func (n *Notice) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &n); err != nil {
+		return err
+	}
+	n.PublishedAt = n.ModifiedAt
+	if n.ModifiedAt.Unix() < n.CreatedAt.Unix() {
+		n.PublishedAt = n.CreatedAt
+	}
+	return nil
 }
 
 // Attachment represents a single attachment in a Notice's attachments
@@ -85,6 +60,44 @@ type Attachment struct {
 // it's useful since FIB API cookies on the user's browser will expire, accessing an attachment's original URL after that will get an `Unauthorized` response
 func (a Attachment) RedirectURL() string {
 	return LoginRedirectBaseURL + url.QueryEscape(a.URL)
+}
+
+// ScheduleResponse represents a user's schedule API response
+// Endpoint: /jo/classes.json
+type ScheduleResponse struct {
+	Count   int     `json:"count"`
+	Results []Class `json:"results"`
+}
+
+// Class represents a single class in a ScheduleResponse API response
+type Class struct {
+	SubjectCode string `json:"codi_assig"`
+	Group       string `json:"grup"`
+	DayOfWeek   int    `json:"dia_setmana"`
+	StartTime   string `json:"inici"`
+	Duration    int    `json:"durada"`
+	Types       string `json:"tipus"`
+	Classrooms  string `json:"aules"`
+}
+
+// SubjectsResponse represents a user's subjects API response
+// Endpoint: /jo/assignatures.json
+type SubjectsResponse struct {
+	Count   int       `json:"count"`
+	Results []Subject `json:"results"`
+}
+
+// Subject represents a single subject in a SubjectsResponse API response
+type Subject struct {
+	ID       string  `json:"id"`
+	URL      string  `json:"url"`
+	GuideURL string  `json:"guia"`
+	Group    string  `json:"grup"`
+	Acronym  string  `json:"sigles"`
+	UPCCode  int     `json:"codi_upc"`
+	Semester string  `json:"semestre"`
+	Credits  float32 `json:"credits"`
+	Name     string  `json:"nom"`
 }
 
 // TimeDate represents the time&date data in API response JSONs

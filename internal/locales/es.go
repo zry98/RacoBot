@@ -11,7 +11,7 @@ var es = Locale{
 	NoticeMessageAttachmentIndicator:       "%s\n\n<i>- Con %d %s:</i>\n%s",
 	NoticeMessageTooLongErrorMessage:       "[%s] <b>%s</b>\n\nLo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href=\"%s\">este enlace</a>.",
 	NoticeUnavailableErrorMessage:          "<i>Aviso no disponible</i>",
-	NoNoticesAvailableErrorMessage:         "<i>No hay avisos disponibles</i>",
+	NoAvailableNoticesErrorMessage:         "<i>No hay avisos disponibles</i>",
 	InternalErrorMessage:                   "<i>Error interno</i>",
 	FIBAPIAuthorizationExpiredErrorMessage: "La autorización ha caducado, por favor /login para iniciar la sesión de nuevo.",
 	LoginLinkMessage:                       "<a href=\"%s\">Autorizar Racó Bot</a>",

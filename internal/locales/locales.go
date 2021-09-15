@@ -11,7 +11,7 @@ type Locale struct {
 	NoticeMessageAttachmentIndicator       string
 	NoticeMessageTooLongErrorMessage       string
 	NoticeUnavailableErrorMessage          string
-	NoNoticesAvailableErrorMessage         string
+	NoAvailableNoticesErrorMessage         string
 	InternalErrorMessage                   string
 	FIBAPIAuthorizationExpiredErrorMessage string
 	LoginLinkMessage                       string
