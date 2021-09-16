@@ -9,7 +9,7 @@ import {
   NoAvailableNoticesErrorMessage,
 } from './constants'
 import { buildNoticeMessage, getHash } from './helpers'
-import { Notices, UserInfo } from './structs'
+import { Notices, UserInfo } from './models'
 
 function Bot(token) {
   let bot = new Telegraf(token)
