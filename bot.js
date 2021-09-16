@@ -1,12 +1,12 @@
 import { Telegraf } from 'telegraf'
 import {
+  AccessTokenKeyName,
   BotUserID,
   FIBAPIBaseURL,
-  AccessTokenKeyName,
-  RefreshTokenKeyName,
   LastNoticeTimestampKeyName,
-  NoticeUnavailableErrorMessage,
   NoAvailableNoticesErrorMessage,
+  NoticeUnavailableErrorMessage,
+  RefreshTokenKeyName,
 } from './constants'
 import { buildNoticeMessage, getHash } from './helpers'
 import { Notices, UserInfo } from './models'
@@ -33,27 +33,47 @@ function Bot(token) {
     await bot.telegram.sendMessage(BotUserID, `Hello, ${userInfo.firstName}!`)
   }
 
-  // pulls notices from FIB API and forwards those newer ones to user
-  bot.pushNewNotices = async () => {
+  // gets all notices from FIB API
+  bot.getNotices = async () => {
     const accessToken = await getAccessToken()
-    const notices = new Notices(await (await fetch(`${FIBAPIBaseURL}/jo/avisos.json`, {
+    return new Notices(await (await fetch(`${FIBAPIBaseURL}/jo/avisos.json`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     })).json())
+  }
+
+  // gets new notices from FIB API
+  bot.getNewNotices = async () => {
+    const notices = await bot.getNotices()
     if (notices.length === 0) {
-      await bot.telegram.sendMessage(BotUserID, NoAvailableNoticesErrorMessage, { parse_mode: 'HTML' })
-      return
+      return []
     }
 
     notices.sort((i, j) => i.publishedAt - j.publishedAt)
 
+    let newNotices = []
     const lastNoticeTimestamp = parseInt(await KV.get(LastNoticeTimestampKeyName))
     for (const notice of notices) {
       if (notice.publishedAt > lastNoticeTimestamp) {
-        const msg = await buildNoticeMessage(notice)
-        await bot.telegram.sendMessage(BotUserID, msg, { parse_mode: 'HTML' })
+        newNotices.push(notice)
       }
     }
+
+    // updates last notice timestamp in KV
     await KV.put(LastNoticeTimestampKeyName, notices[notices.length - 1].publishedAt.toString())
+    return newNotices
+  }
+
+  // gets and pushes new notices
+  bot.pushNewNotices = async () => {
+    const newNotices = await bot.getNewNotices()
+    if (newNotices.length === 0) {
+      return
+    }
+
+    for (const notice of notices) {
+      const msg = await buildNoticeMessage(notice)
+      await bot.telegram.sendMessage(BotUserID, msg, { parse_mode: 'HTML' })
+    }
   }
 
   // starts PM session
@@ -78,10 +98,7 @@ function Bot(token) {
 
   // (for notices debugging only)
   bot.command('debug', async (ctx) => {
-    const accessToken = await getAccessToken()
-    const notices = new Notices(await (await fetch(`${FIBAPIBaseURL}/jo/avisos.json`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-    })).json())
+    const notices = await bot.getNotices()
     if (notices.length === 0) {
       await ctx.replyWithHTML(NoAvailableNoticesErrorMessage)
       return
@@ -101,7 +118,15 @@ function Bot(token) {
 
   // (for notices debugging only)
   bot.command('test', async (ctx) => {
-    await bot.pushNewNotices()
+    const notices = await bot.getNotices()
+    if (notices.length === 0) {
+      await ctx.replyWithHTML(NoAvailableNoticesErrorMessage)
+      return
+    }
+
+    notices.sort((i, j) => i.publishedAt - j.publishedAt)
+    const msg = await buildNoticeMessage(notices[notices.length - 1])
+    await ctx.replyWithHTML(msg)
   })
 
   return bot
