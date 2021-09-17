@@ -63,3 +63,6 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           flags: ${{ matrix.os }},go-${{ matrix.go }}
+
+      - name: Update Go Report Card
+        run: curl -X POST -F "repo=github.com/$GITHUB_REPOSITORY" https://goreportcard.com/checks
