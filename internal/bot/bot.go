@@ -68,8 +68,13 @@ func Init(config BotConfig) {
 		return
 	}
 
+	// save bot username
+	BotUsername = b.Me.Username
+
 	log.Info("Bot OK") // all done, start serving
 }
+
+var BotUsername string
 
 // setWebhook sets the Telegram bot webhook URL to the given one
 func setWebhook(URL string) error {

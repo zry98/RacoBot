@@ -164,7 +164,9 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	guideMessage := locales.Get(loginSession.UserLanguageCode).HelpMessage
 	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{Text: guideMessage})
 
-	fmt.Fprintln(w, AuthorizedResponseBody)
+	// use Telegram URI to redirect user to the chat
+	http.Redirect(w, r, "tg://resolve?domain="+bot.BotUsername, 301)
+	fmt.Fprintln(w, locales.Get(loginSession.UserLanguageCode).AuthorizedResponseBody)
 }
 
 // middleware provides some useful middlewares for the server
