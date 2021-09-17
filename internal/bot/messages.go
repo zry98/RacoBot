@@ -200,7 +200,7 @@ func (m *NoticeMessage) String() (result string) {
 		var sb strings.Builder
 		for _, attachment := range m.Attachments {
 			fileSize := byteCountIEC(attachment.Size)
-			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL(), attachment.Name, fileSize)
+			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 
 		noun := locale.NoticeMessageAttachmentNounPlural

@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"RacoBot/internal/locales"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -9,6 +8,7 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
+	"RacoBot/internal/locales"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -93,7 +93,7 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 		logger.Infof("Fetched %d new notices for user %d", len(newNotices), userID)
 
 		for _, n := range newNotices {
-			bot.SendMessage(userID, n)
+			bot.SendMessage(userID, &n)
 			logger.Infof("Sent new notice %d to user %d", n.ID, userID)
 			sentMessageCount++
 		}

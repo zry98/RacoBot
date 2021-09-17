@@ -33,13 +33,14 @@ type Notice struct {
 	ModifiedAt  TimeDate     `json:"data_modificacio"`
 	ExpiresAt   TimeDate     `json:"data_caducitat"`
 	Attachments []Attachment `json:"adjunts"`
-	PublishedAt TimeDate     `json:"_published_at,omitempty"`
+	PublishedAt TimeDate     `json:"__published_at,omitempty"`
 }
 
-func (n *Notice) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON adds .PublishedAt to the Notice when it's unmarshalled from JSON
+func (n *Notice) UnmarshalJSON(b []byte) error {
 	type Alias Notice
 	tmp := (*Alias)(n)
-	if err := json.Unmarshal(data, tmp); err != nil {
+	if err := json.Unmarshal(b, tmp); err != nil {
 		return err
 	}
 
@@ -52,17 +53,25 @@ func (n *Notice) UnmarshalJSON(data []byte) error {
 
 // Attachment represents a single attachment in a Notice's attachments
 type Attachment struct {
-	MimeTypes  string   `json:"tipus_mime"`
-	Name       string   `json:"nom"`
-	URL        string   `json:"url"`
-	ModifiedAt TimeDate `json:"data_modificacio"`
-	Size       int64    `json:"mida"`
+	MimeTypes   string   `json:"tipus_mime"`
+	Name        string   `json:"nom"`
+	URL         string   `json:"url"`
+	ModifiedAt  TimeDate `json:"data_modificacio"`
+	Size        int64    `json:"mida"`
+	RedirectURL string
 }
 
-// RedirectURL returns an attachment's FIB API login redirect URL
+// UnmarshalJSON adds .RedirectURL (the attachment's FIB API login redirect URL) to the Attachment when it's unmarshalled from JSON
 // it's useful since FIB API cookies on the user's browser will expire, accessing an attachment's original URL after that will get an `Unauthorized` response
-func (a Attachment) RedirectURL() string {
-	return LoginRedirectBaseURL + url.QueryEscape(a.URL)
+func (a *Attachment) UnmarshalJSON(b []byte) error {
+	type Alias Attachment
+	tmp := (*Alias)(a)
+	if err := json.Unmarshal(b, tmp); err != nil {
+		return err
+	}
+
+	a.RedirectURL = LoginRedirectBaseURL + url.QueryEscape(a.URL)
+	return nil
 }
 
 // ScheduleResponse represents a user's schedule API response
