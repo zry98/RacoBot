@@ -101,8 +101,7 @@ func debug(c tb.Context) (err error) {
 	if err == fibapi.NoticeNotFoundError || (err == nil && notice.ID == 0) {
 		// maybe don't exist, or not available to the User
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
-	}
-	if err != nil {
+	} else if err != nil {
 		return
 	}
 

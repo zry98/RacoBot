@@ -44,7 +44,7 @@ func NewClient(userID int64) *Client {
 	}
 }
 
-// updateToken updates the User's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.Client
+// updateToken updates the user's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.Client
 // it should be called (and should be deferred) in every API caller
 func (c *Client) updateToken() {
 	newToken, err := c.Client.Transport.(*oauth2.Transport).Source.Token()
@@ -54,6 +54,7 @@ func (c *Client) updateToken() {
 	}
 
 	if newToken.AccessToken != c.User.AccessToken {
+		log.Info("updating token...")
 		c.User.AccessToken = newToken.AccessToken
 		c.User.RefreshToken = newToken.RefreshToken
 		c.User.TokenExpiry = newToken.Expiry.Unix()
@@ -64,7 +65,7 @@ func (c *Client) updateToken() {
 	}
 }
 
-// GetFullName gets the User's full name (`${firstName} ${lastName}`)
+// GetFullName gets the user's full name (`${firstName} ${lastName}`)
 func (c *Client) GetFullName() (fullName string, err error) {
 	if c == nil {
 		err = UserNotFoundError
@@ -81,7 +82,7 @@ func (c *Client) GetFullName() (fullName string, err error) {
 	return
 }
 
-// GetNotices gets the User's notice messages
+// GetNotices gets the user's notice messages
 func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
 		err = UserNotFoundError
@@ -117,7 +118,7 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 	return
 }
 
-// GetNewNotices gets the User's new notice messages
+// GetNewNotices gets the user's new notice messages
 func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
 		err = UserNotFoundError
@@ -141,24 +142,24 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	}
 
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].PublishedAt().Unix() < res[j].PublishedAt().Unix()
+		return res[i].PublishedAt.Before(res[j].PublishedAt.Time)
 	})
 
 	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
 		for _, n := range res {
-			if n.PublishedAt().Unix() > c.User.LastNoticeTimestamp {
+			if n.PublishedAt.Unix() > c.User.LastNoticeTimestamp {
 				ns = append(ns, NoticeMessage{n, c.User})
 			}
 		}
 	}
 
 	c.User.LastNoticesHash = noticesHash
-	c.User.LastNoticeTimestamp = res[len(res)-1].PublishedAt().Unix()
+	c.User.LastNoticeTimestamp = res[len(res)-1].PublishedAt.Unix()
 	err = db.PutUser(c.User)
 	return
 }
 
-// Logout revokes the User's OAuth token and deletes it from the database
+// Logout revokes the user's OAuth token and deletes it from the database
 func (c *Client) Logout() (err error) {
 	if c == nil {
 		err = UserNotFoundError

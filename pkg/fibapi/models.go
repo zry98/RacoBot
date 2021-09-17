@@ -33,13 +33,16 @@ type Notice struct {
 	ModifiedAt  TimeDate     `json:"data_modificacio"`
 	ExpiresAt   TimeDate     `json:"data_caducitat"`
 	Attachments []Attachment `json:"adjunts"`
-	PublishedAt TimeDate
+	PublishedAt TimeDate     `json:"_published_at,omitempty"`
 }
 
 func (n *Notice) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &n); err != nil {
+	type Alias Notice
+	tmp := (*Alias)(n)
+	if err := json.Unmarshal(data, tmp); err != nil {
 		return err
 	}
+
 	n.PublishedAt = n.ModifiedAt
 	if n.ModifiedAt.Unix() < n.CreatedAt.Unix() {
 		n.PublishedAt = n.CreatedAt
