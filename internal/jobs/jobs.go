@@ -30,9 +30,6 @@ func RunJobs(config JobsConfig) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warn("error recovered in RunJobs ", err)
-			if err == bot.UserNotFoundError {
-
-			}
 		}
 	}()
 

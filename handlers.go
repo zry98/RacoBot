@@ -95,7 +95,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	loginSession, err := db.GetLoginSession(state)
-	if err == db.LoginSessionNotFoundError || (&loginSession != nil && loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0) {
+	if err == db.LoginSessionNotFoundError || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
 		log.WithFields(log.Fields{
 			"ip": r.RemoteAddr,
 			"s":  state,
@@ -162,7 +162,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	bot.SendMessage(loginSession.UserID, greetingMessage)
 
 	guideMessage := locales.Get(loginSession.UserLanguageCode).HelpMessage
-	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{guideMessage})
+	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{Text: guideMessage})
 
 	fmt.Fprintln(w, AuthorizedResponseBody)
 }

@@ -100,7 +100,7 @@ func (c *Client) GetSubjects() ([]Subject, error) {
 	var subjects SubjectsResponse
 	err = json.Unmarshal(body, &subjects)
 	if err != nil {
-		err = fmt.Errorf("error parsing SubjectsResponse response: %s\n%s", string(body), err)
+		return nil, fmt.Errorf("error parsing SubjectsResponse response: %s\n%s", string(body), err)
 	}
 	return subjects.Results, nil
 }
