@@ -66,6 +66,7 @@ func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 const (
 	messageMaxLength      int    = 4096
 	RacoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
+	RacoBaseURL           string = "https://raco.fib.upc.edu"
 )
 
 // these are the HTML tags Telegram supported
@@ -131,6 +132,22 @@ func (m *NoticeMessage) String() (result string) {
 								return hr.Stop
 							}
 							if err := e.SetTagName("u"); err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							return hr.Continue
+						},
+					},
+					{
+						Selector: "a[href^='/']",
+						// links with path-only URL
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							href, err := e.AttributeValue("href")
+							if err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							if err := e.SetAttribute("href", (RacoBaseURL + href)); err != nil {
 								log.Error(err)
 								return hr.Stop
 							}
