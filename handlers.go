@@ -20,7 +20,6 @@ const (
 	InternalErrorResponseBody  = "Internal error"
 	RateLimitedResponseBody    = "Rate limited"
 	InvalidRequestResponseBody = "Authorization failed (invalid request)"
-	AuthorizedResponseBody     = "<h1>Authorized</h1>" // TODO: make it nicer
 )
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
