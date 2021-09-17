@@ -2,6 +2,7 @@ package locales
 
 type Locale struct {
 	StartMessage                           string
+	AuthorizedResponseBody                 string
 	GreetingMessage                        string
 	HelpMessage                            string
 	AlreadyLoggedInMessage                 string

@@ -2,6 +2,7 @@ package locales
 
 var es = Locale{
 	StartMessage:                           "Por favor /login para autorizar Racó Bot.",
+	AuthorizedResponseBody:                 "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"><title>Racó Bot</title></head><body><h1>Autorizado</h1><p>Puede cerrar el navegador y volver a Telegram.</p></body></html>",
 	GreetingMessage:                        "¡Hola, %s!",
 	HelpMessage:                            "Puede usar:\n/test para obtener una vista previa del último aviso\n/logout para dejar de recibir mensajes y revocar la autorización en el servidor.",
 	AlreadyLoggedInMessage:                 "Ya has iniciado la sesión, compruebe /whoami; o /logout para revocar la autorización.",
