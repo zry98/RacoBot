@@ -18,17 +18,11 @@ import (
 
 var b *tb.Bot
 
-// Update represents a Telegram bot Update
-type Update struct {
-	tb.Update
-	// new fields of bot API v5.1, waiting for telebot to implement them...
-	MyChatMember struct{} `json:"my_chat_member,omitempty"`
-	ChatMember   struct{} `json:"chat_member,omitempty"`
-}
+type Update tb.Update
 
-// HandleUpdate handles a Telegram bot Update
+// HandleUpdate handles a Telegram bot update
 func HandleUpdate(u Update) {
-	b.ProcessUpdate(u.Update)
+	b.ProcessUpdate(tb.Update(u))
 }
 
 // BotConfig represents a configuration for Telegram bot

@@ -54,10 +54,9 @@ func (c *Client) updateToken() {
 	}
 
 	if newToken.AccessToken != c.User.AccessToken {
-		log.Info("updating token...")
 		c.User.AccessToken = newToken.AccessToken
 		c.User.RefreshToken = newToken.RefreshToken
-		c.User.TokenExpiry = newToken.Expiry.Unix()
+		c.User.TokenExpiry = newToken.Expiry.Unix() - 60  // TODO: tune the precaution seconds
 		if err = db.PutUser(c.User); err != nil {
 			log.Error(err)
 			return
@@ -65,7 +64,7 @@ func (c *Client) updateToken() {
 	}
 }
 
-// GetFullName gets the user's full name (`${firstName} ${lastName}`)
+// GetFullName gets the user's full name (as format of `${firstName} ${lastName}`)
 func (c *Client) GetFullName() (fullName string, err error) {
 	if c == nil {
 		err = UserNotFoundError

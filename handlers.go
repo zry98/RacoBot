@@ -53,9 +53,9 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var userID int64
 	if update.Message != nil {
-		userID = int64(update.Message.Sender.ID)
+		userID = update.Message.Sender.ID
 	} else if update.Callback != nil {
-		userID = int64(update.Callback.Sender.ID)
+		userID = update.Callback.Sender.ID
 	}
 	if userID != 0 && !ratelimiters.BotUpdateAllowed(r.Context(), userID) {
 		// TODO: handle rate limited users
