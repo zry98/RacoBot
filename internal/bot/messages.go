@@ -217,6 +217,7 @@ func (m *NoticeMessage) String() (result string) {
 		var sb strings.Builder
 		for _, attachment := range m.Attachments {
 			fileSize := byteCountIEC(attachment.Size)
+			fileSize = strings.ReplaceAll(fileSize, ".", string(locale.DecimalSeparator))
 			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 
@@ -247,7 +248,7 @@ func byteCountIEC(b int64) string {
 		div *= unit
 		exp++
 	}
-	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 // ErrorMessage represents a message containing error info

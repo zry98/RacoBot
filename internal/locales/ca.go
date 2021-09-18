@@ -19,4 +19,5 @@ var ca = Locale{
 	ChoosePreferredLanguageMenuText:        "Escolliu l'idioma que preferiu:",
 	LanguageUnavailableErrorMessage:        "<i>Idioma no disponible</i>",
 	PreferredLanguageSetMessage:            "L'idioma preferit s'ha configurat a català.",
+	DecimalSeparator:                       ',',
 }

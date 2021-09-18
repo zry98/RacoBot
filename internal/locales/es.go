@@ -19,4 +19,5 @@ var es = Locale{
 	ChoosePreferredLanguageMenuText:        "Elija su idioma preferido:",
 	LanguageUnavailableErrorMessage:        "<i>Idioma no disponible</i>",
 	PreferredLanguageSetMessage:            "El idioma preferido se ha configurado a castellano.",
+	DecimalSeparator:                       ',',
 }

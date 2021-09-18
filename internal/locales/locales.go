@@ -20,6 +20,7 @@ type Locale struct {
 	ChoosePreferredLanguageMenuText        string
 	LanguageUnavailableErrorMessage        string
 	PreferredLanguageSetMessage            string
+	DecimalSeparator                       rune
 }
 
 var defaultLocale *Locale

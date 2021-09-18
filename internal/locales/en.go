@@ -19,4 +19,5 @@ var en = Locale{
 	ChoosePreferredLanguageMenuText:        "Please choose your preferred language:",
 	LanguageUnavailableErrorMessage:        "<i>Language unavailable</i>",
 	PreferredLanguageSetMessage:            "The preferred language has been set to English.",
+	DecimalSeparator:                       '.',
 }
