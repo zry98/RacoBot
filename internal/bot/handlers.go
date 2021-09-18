@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"RacoBot/internal/db/ratelimiters"
 	"sort"
 	"strconv"
 
@@ -9,7 +10,6 @@ import (
 
 	"RacoBot/internal/db"
 	"RacoBot/internal/locales"
-	"RacoBot/internal/ratelimiters"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -29,7 +29,7 @@ func login(c tb.Context) (err error) {
 	}
 
 	user, err := db.GetUser(userID)
-	if err != nil && err != db.UserNotFoundError {
+	if err != nil && err != db.ErrUserNotFound {
 		log.Error(err)
 		return
 	}
@@ -74,7 +74,7 @@ func logout(c tb.Context) (err error) {
 	userID := int64(c.Sender().ID)
 	client := NewClient(userID)
 	if client == nil {
-		return UserNotFoundError
+		return ErrUserNotFound
 	}
 	err = client.Logout()
 	if err != nil {
@@ -95,10 +95,10 @@ func debug(c tb.Context) (err error) {
 
 	client := NewClient(userID)
 	if client == nil {
-		return UserNotFoundError
+		return ErrUserNotFound
 	}
 	notice, err := client.GetNotice(noticeID)
-	if err == fibapi.NoticeNotFoundError || (err == nil && notice.ID == 0) {
+	if err == fibapi.ErrNoticeNotFound || (err == nil && notice.ID == 0) {
 		// notice doesn't exist or isn't available to the user
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
 	} else if err != nil {
@@ -114,7 +114,7 @@ func test(c tb.Context) (err error) {
 	userID := int64(c.Sender().ID)
 	client := NewClient(userID)
 	if client == nil {
-		return UserNotFoundError
+		return ErrUserNotFound
 	}
 	notices, noticesHash, err := client.GetNoticesWithHash()
 	if err != nil {
@@ -153,33 +153,32 @@ var (
 // on command `/lang`, on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
 // setPreferredLanguage replies the menu of preferred languages for the user to choose from, or sets the user's preferred language with the given callback
 func setPreferredLanguage(c tb.Context) error {
+	// on command `/lang`, show menu of languages
 	if c.Callback() == nil {
-		// on command `/lang`, show menu of languages
 		user, err := db.GetUser(int64(c.Sender().ID))
 		if err != nil {
 			return err
 		}
 
 		return c.Reply(locales.Get(user.LanguageCode).ChoosePreferredLanguageMenuText, setLanguageMenu)
-
-	} else {
-		// on callbacks, set language accordingly
-		languageCode := c.Callback().Unique
-		if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
-			return c.Reply(locales.Get("").InternalErrorMessage)
-		}
-
-		userID := int64(c.Sender().ID)
-		user, err := db.GetUser(userID)
-		if err != nil {
-			return err
-		}
-
-		user.LanguageCode = languageCode
-		if err = db.PutUser(user); err != nil {
-			return err
-		}
-
-		return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
 	}
+
+	// on callbacks, set language accordingly
+	languageCode := c.Callback().Unique
+	if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
+		return c.Reply(locales.Get("").InternalErrorMessage)
+	}
+
+	userID := int64(c.Sender().ID)
+	user, err := db.GetUser(userID)
+	if err != nil {
+		return err
+	}
+
+	user.LanguageCode = languageCode
+	if err = db.PutUser(user); err != nil {
+		return err
+	}
+
+	return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
 }

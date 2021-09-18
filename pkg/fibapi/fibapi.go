@@ -10,8 +10,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// FIBAPIConfig represents a configuration for FIB API OAuth application
-type FIBAPIConfig struct {
+// Config represents a configuration for FIB API OAuth application
+type Config struct {
 	OAuthClientID     string `toml:"oauth_client_id"`
 	OAuthClientSecret string `toml:"oauth_client_secret"`
 	OAuthRedirectURI  string `toml:"oauth_redirect_URI"`
@@ -20,7 +20,7 @@ type FIBAPIConfig struct {
 var oauthConf *oauth2.Config
 
 // Init initializes the FIB API OAuth configuration instance
-func Init(config FIBAPIConfig) {
+func Init(config Config) {
 	oauthConf = &oauth2.Config{
 		ClientID:     config.OAuthClientID,
 		ClientSecret: config.OAuthClientSecret,
@@ -46,7 +46,7 @@ func Authorize(authorizationCode string) (token *oauth2.Token, userInfo UserInfo
 	if err != nil {
 		if errData, ok := err.(*oauth2.RetrieveError); ok && errData.Response.StatusCode == http.StatusBadRequest &&
 			string(errData.Body) == OAuthInvalidAuthorizationCodeResponse {
-			err = InvalidAuthorizationCodeError
+			err = ErrInvalidAuthorizationCode
 		}
 		return
 	}
@@ -57,7 +57,7 @@ func Authorize(authorizationCode string) (token *oauth2.Token, userInfo UserInfo
 		return
 	}
 	if userInfo.Username == "" {
-		err = InvalidAuthorizationCodeError
+		err = ErrInvalidAuthorizationCode
 	}
 	return
 }

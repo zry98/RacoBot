@@ -21,7 +21,7 @@ type Client struct {
 
 // errors
 var (
-	UserNotFoundError = errors.New("user not found")
+	ErrUserNotFound = errors.New("user not found")
 )
 
 // NewClient initializes a FIB API client with the given Telegram UserID
@@ -67,7 +67,7 @@ func (c *Client) updateToken() {
 // GetFullName gets the user's full name (as format of `${firstName} ${lastName}`)
 func (c *Client) GetFullName() (fullName string, err error) {
 	if c == nil {
-		err = UserNotFoundError
+		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
@@ -84,7 +84,7 @@ func (c *Client) GetFullName() (fullName string, err error) {
 // GetNotices gets the user's notice messages
 func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
-		err = UserNotFoundError
+		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
@@ -103,7 +103,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 // GetNotice gets a specific notice message with the given ID
 func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 	if c == nil {
-		err = UserNotFoundError
+		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
@@ -120,7 +120,7 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 // GetNewNotices gets the user's new notice messages
 func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	if c == nil {
-		err = UserNotFoundError
+		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
@@ -161,7 +161,7 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 // Logout revokes the user's OAuth token and deletes it from the database
 func (c *Client) Logout() (err error) {
 	if c == nil {
-		err = UserNotFoundError
+		err = ErrUserNotFound
 		return
 	}
 

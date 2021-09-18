@@ -9,8 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// RedisConfig represents a configuration for redis connection
-type RedisConfig struct {
+// Config represents a configuration for redis connection
+type Config struct {
 	Address  string `toml:"address"`
 	Username string `toml:"username"`
 	Password string `toml:"password"`
@@ -24,7 +24,7 @@ var (
 )
 
 // Init initializes the DB clients
-func Init(config RedisConfig) {
+func Init(config Config) {
 	addrType := "tcp"
 	if strings.HasPrefix(config.Address, "/") { // for unix sockets
 		addrType = "unix"

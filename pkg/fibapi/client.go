@@ -87,7 +87,7 @@ func (c *Client) GetNotice(ID int64) (Notice, error) {
 			return n, nil
 		}
 	}
-	return Notice{}, NoticeNotFoundError
+	return Notice{}, ErrNoticeNotFound
 }
 
 // GetSubjects gets the user's subjects
@@ -105,7 +105,7 @@ func (c *Client) GetSubjects() ([]Subject, error) {
 	return subjects.Results, nil
 }
 
-const RevokeTokenRequestMimeType = "application/x-www-form-urlencoded"
+const revokeTokenRequestMimeType = "application/x-www-form-urlencoded"
 
 // RevokeToken revokes the user's OAuth token
 func (c *Client) RevokeToken() (err error) {
@@ -118,7 +118,7 @@ func (c *Client) RevokeToken() (err error) {
 		"client_id": {oauthConf.ClientID},
 		"token":     {token.AccessToken},
 	}
-	_, err = c.Client.Post(OAuthRevokeURL, RevokeTokenRequestMimeType, strings.NewReader(params.Encode()))
+	_, err = c.Client.Post(OAuthRevokeURL, revokeTokenRequestMimeType, strings.NewReader(params.Encode()))
 	return
 }
 
@@ -154,10 +154,10 @@ func (c *Client) request(method, URL string) (body []byte, header http.Header, e
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
 			// token has been revoked on server
-			err = AuthorizationExpiredError
+			err = ErrAuthorizationExpired
 		} else {
 			// TODO: handle more other errors
-			err = UnknownError
+			err = ErrUnknown
 		}
 	}
 	return

@@ -25,8 +25,8 @@ func HandleUpdate(u Update) {
 	b.ProcessUpdate(tb.Update(u))
 }
 
-// BotConfig represents a configuration for Telegram bot
-type BotConfig struct {
+// Config represents a configuration for Telegram bot
+type Config struct {
 	Token      string `toml:"token"`
 	WebhookURL string `toml:"webhook_URL"`
 }
@@ -37,7 +37,7 @@ func init() {
 }
 
 // Init initializes the bot
-func Init(config BotConfig) {
+func Init(config Config) {
 	var err error
 	b, err = tb.NewBot(tb.Settings{
 		Token:       config.Token,
@@ -120,7 +120,7 @@ func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 		err = next(c)
 		if err != nil {
 			errData, ok := err.(*oauth2.RetrieveError)
-			if err == UserNotFoundError || err == fibapi.AuthorizationExpiredError ||
+			if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
 				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
 				userID := int64(c.Sender().ID)
 				log.WithField("uid", userID).Info(err)

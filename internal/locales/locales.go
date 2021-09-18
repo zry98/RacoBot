@@ -1,5 +1,6 @@
 package locales
 
+// Locale represents a locale (group of translations)
 type Locale struct {
 	StartMessage                           string
 	AuthorizedResponseBody                 string
@@ -21,12 +22,13 @@ type Locale struct {
 	PreferredLanguageSetMessage            string
 }
 
-var default_locale *Locale
+var defaultLocale *Locale
 
 func init() {
-	default_locale = &en
+	defaultLocale = &en
 }
 
+// Get returns a Locale by the given language code
 func Get(languageCode string) *Locale {
 	switch languageCode {
 	case "en":
@@ -36,6 +38,6 @@ func Get(languageCode string) *Locale {
 	case "ca":
 		return &ca
 	default:
-		return default_locale
+		return defaultLocale
 	}
 }

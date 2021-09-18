@@ -26,8 +26,8 @@ const OAuthInvalidAuthorizationCodeResponse = `{"error": "invalid_grant"}`
 
 // errors
 var (
-	InvalidAuthorizationCodeError = errors.New("fibapi: invalid authorization code")
-	AuthorizationExpiredError     = errors.New("fibapi: authorization expired")
-	NoticeNotFoundError           = errors.New("fibapi: notice not found")
-	UnknownError                  = errors.New("fibapi: unknown error")
+	ErrInvalidAuthorizationCode = errors.New("fibapi: invalid authorization code")
+	ErrAuthorizationExpired     = errors.New("fibapi: authorization expired")
+	ErrNoticeNotFound           = errors.New("fibapi: notice not found")
+	ErrUnknown                  = errors.New("fibapi: unknown error")
 )

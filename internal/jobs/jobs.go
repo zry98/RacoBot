@@ -12,20 +12,20 @@ import (
 	"RacoBot/pkg/fibapi"
 )
 
-// JobsConfig represents a configuration for the jobs
-type JobsConfig struct {
+// Config represents a configuration for the jobs
+type Config struct {
 	PushNewNoticesCron string `toml:"push_new_notices_cron"`
 }
 
 // Init initializes the jobs
-func Init(config JobsConfig) {
+func Init(config Config) {
 	if config.PushNewNoticesCron != "" {
 		go RunJobs(config)
 	}
 }
 
 // RunJobs initializes the scheduler and starts the jobs
-func RunJobs(config JobsConfig) {
+func RunJobs(config Config) {
 	// TODO: use MQ?
 	defer func() {
 		if err := recover(); err != nil {
@@ -76,7 +76,7 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 
 		newNotices, err := client.GetNewNotices()
 		if err != nil {
-			if err == fibapi.AuthorizationExpiredError {
+			if err == fibapi.ErrAuthorizationExpired {
 				logger.Infof("FIB API token expired for user %d", userID)
 				bot.SendMessage(userID, locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 				if err = db.DeleteUser(userID); err != nil {

@@ -10,8 +10,8 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
+	rl "RacoBot/internal/db/ratelimiters"
 	"RacoBot/internal/locales"
-	"RacoBot/internal/ratelimiters"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -56,7 +56,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	} else if update.Callback != nil {
 		userID = update.Callback.Sender.ID
 	}
-	if userID != 0 && !ratelimiters.BotUpdateAllowed(r.Context(), userID) {
+	if userID != 0 && !rl.BotUpdateAllowed(r.Context(), userID) {
 		// TODO: handle rate limited users
 		log.WithFields(log.Fields{
 			"uid": userID,
@@ -87,19 +87,19 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !ratelimiters.OAuthRedirectRequestAllowed(r.Context(), r.RemoteAddr) {
+	if !rl.OAuthRedirectRequestAllowed(r.Context(), r.RemoteAddr) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintln(w, RateLimitedResponseBody)
 		return
 	}
 
 	loginSession, err := db.GetLoginSession(state)
-	if err == db.LoginSessionNotFoundError || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
+	if err == db.ErrLoginSessionNotFound || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
 		log.WithFields(log.Fields{
 			"ip": r.RemoteAddr,
 			"s":  state,
 			"c":  code,
-		}).Info("Invalid redirect request (login session not found)")
+		}).Info("Invalid OAuth redirect request (login session not found)")
 
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintln(w, InvalidRequestResponseBody)
@@ -115,13 +115,13 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	token, userInfo, err := fibapi.Authorize(code)
 	if err != nil {
-		if err == fibapi.InvalidAuthorizationCodeError {
+		if err == fibapi.ErrInvalidAuthorizationCode {
 			log.WithFields(log.Fields{
 				"ip":  r.RemoteAddr,
 				"s":   state,
 				"c":   code,
 				"uid": loginSession.UserID,
-			}).Info("Invalid redirect request (invalid authorization code)")
+			}).Info("Invalid OAuth redirect request (invalid authorization code)")
 		} else {
 			// other internal errors
 			log.Warn(err)
@@ -165,6 +165,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	// use Telegram URI to redirect user to the chat
 	http.Redirect(w, r, "tg://resolve?domain="+bot.BotUsername, 301)
+	// FIXME: message HTML after failed 301 redirect
 	fmt.Fprintln(w, locales.Get(loginSession.UserLanguageCode).AuthorizedResponseBody)
 }
 

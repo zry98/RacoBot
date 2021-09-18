@@ -65,8 +65,8 @@ func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 
 const (
 	messageMaxLength      int    = 4096
-	RacoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
-	RacoBaseURL           string = "https://raco.fib.upc.edu"
+	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
+	racoBaseURL           string = "https://raco.fib.upc.edu"
 )
 
 // these are the HTML tags Telegram supported
@@ -147,7 +147,7 @@ func (m *NoticeMessage) String() (result string) {
 								log.Error(err)
 								return hr.Stop
 							}
-							if err := e.SetAttribute("href", (RacoBaseURL + href)); err != nil {
+							if err := e.SetAttribute("href", (racoBaseURL + href)); err != nil {
 								log.Error(err)
 								return hr.Stop
 							}
@@ -231,7 +231,7 @@ func (m *NoticeMessage) String() (result string) {
 		result = fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage,
 			m.SubjectCode,
 			m.Title,
-			fmt.Sprintf(RacoNoticeURLTemplate, m.SubjectCode, m.ID))
+			fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID))
 	}
 	return result
 }

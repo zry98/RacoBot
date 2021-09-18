@@ -40,8 +40,8 @@ const (
 
 // errors
 var (
-	LoginSessionNotFoundError = errors.New("db: login session not found")
-	UserNotFoundError         = errors.New("db: user not found")
+	ErrLoginSessionNotFound = errors.New("db: login session not found")
+	ErrUserNotFound         = errors.New("db: user not found")
 )
 
 // NewLoginSession creates a new login session for a user with the given ID
@@ -67,7 +67,7 @@ func GetLoginSession(state string) (s LoginSession, err error) {
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
-			err = LoginSessionNotFoundError
+			err = ErrLoginSessionNotFound
 		}
 		return
 	}
@@ -99,7 +99,7 @@ func GetUser(userID int64) (user User, err error) {
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
-			err = UserNotFoundError
+			err = ErrUserNotFound
 		}
 		return
 	}
