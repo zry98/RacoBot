@@ -1,4 +1,5 @@
 import { decode } from 'html-entities'  // for un-escaping HTML entities like `&#39;` since HTMLRewriter can't do that
+import { RacoBaseURL } from './constants'
 
 // buildNoticeMessage formats a notice to a proper string ready to be sent by bot
 async function buildNoticeMessage(notice) {
@@ -29,6 +30,9 @@ async function buildNoticeMessage(notice) {
         // underlines
         e.tagName = 'u'
         e.removeAttribute('style')
+      } else if (e.tagName === 'a' && e.hasAttribute('href') && e.getAttribute('href').startsWith('/')) {
+        // links with path-only URL
+        e.setAttribute('href', RacoBaseURL + e.getAttribute('href'))
       }
       if (!supportedTagNames.includes(e.tagName)) {
         // strip all the other tags since Telegram doesn't support them
@@ -80,9 +84,6 @@ function byteCountIEC(b) {
 // getHash returns the base64 encoded SHA-256 hash of the given data
 async function getHash(data) {
   const encoder = new TextEncoder()
-  // return Array.from(new Uint8Array(
-  //   await crypto.subtle.digest('SHA-256', encoder.encode(data)))
-  // ).map(b => b.toString(16).padStart(2, '0')).join('')
   return btoa(String.fromCharCode(...new Uint8Array(
     await crypto.subtle.digest('SHA-256', encoder.encode(data))
   )))

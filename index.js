@@ -3,8 +3,8 @@ import {
   TelegramBotAPIToken,
   AuthorizedHTML,
   TelegramBotWebhookPath,
-  BotUserID,
-  FIBAPIOAuthRedirectURLPath
+  TelegramUserID,
+  FIBAPIOAuthRedirectURLPath,
 } from './constants'
 import { getHash, timingSafeEqual } from './helpers'
 
@@ -26,15 +26,13 @@ async function handleRequest(request) {
     return new Response('OK')
 
   } else if (request.method === 'GET' && url.pathname.startsWith(FIBAPIOAuthRedirectURLPath)) {  // FIB API OAuth callback
-    const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state')
-    if (!code || !state || code.length !== 30
-      || !timingSafeEqual(state, await getHash(BotUserID.toString()))) {
+    const code = url.searchParams.get('code'), state = url.searchParams.get('state')
+    if (!code || !state || code.length !== 30 ||
+      !timingSafeEqual(state, await getHash(TelegramUserID.toString()))) {
       throw new Error('Invalid OAuth callback request')
     }
 
     await bot.authorize(code)
-
     return new Response(AuthorizedHTML, {
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     })

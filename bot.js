@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf'
 import {
   AccessTokenKeyName,
-  BotUserID,
+  TelegramUserID,
   FIBAPIBaseURL,
   LastNoticeTimestampKeyName,
   NoAvailableNoticesErrorMessage,
@@ -9,7 +9,7 @@ import {
   RefreshTokenKeyName,
 } from './constants'
 import { buildNoticeMessage, getHash } from './helpers'
-import { Notices, UserInfo } from './models'
+import { UserInfo, Notices } from './models'
 
 function Bot(token) {
   let bot = new Telegraf(token)
@@ -17,7 +17,7 @@ function Bot(token) {
   // middlewares
   bot.use(async (ctx, next) => {
     // user authentication
-    if (ctx.from.id !== BotUserID) {
+    if (ctx.from.id !== TelegramUserID) {
       return
     }
     await next()
@@ -30,7 +30,7 @@ function Bot(token) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     })).json())
 
-    await bot.telegram.sendMessage(BotUserID, `Hello, ${userInfo.firstName}!`)
+    await bot.telegram.sendMessage(TelegramUserID, `Hello, ${userInfo.firstName}!`)
   }
 
   // gets all notices from FIB API
@@ -65,14 +65,14 @@ function Bot(token) {
 
   // gets and pushes new notices
   bot.pushNewNotices = async () => {
-    const newNotices = await bot.getNewNotices()
-    if (newNotices.length === 0) {
+    const notices = await bot.getNewNotices()
+    if (notices.length === 0) {
       return
     }
 
     for (const notice of notices) {
       const msg = await buildNoticeMessage(notice)
-      await bot.telegram.sendMessage(BotUserID, msg, { parse_mode: 'HTML' })
+      await bot.telegram.sendMessage(TelegramUserID, msg, { parse_mode: 'HTML' })
     }
   }
 
@@ -81,7 +81,7 @@ function Bot(token) {
 
   // generates login (FIB API OAuth authorization) link and sends it to user
   bot.command('login', async (ctx) => {
-    const state = await getHash(BotUserID.toString())
+    const state = await getHash(TelegramUserID.toString())
     const oauthURL = `${FIBAPIBaseURL}/o/authorize/?client_id=${FIBAPI_OAUTH_CLIENT_ID}&redirect_uri=${FIBAPI_REDIRECT_URI}&response_type=code&scope=read&state=${state}`
     await ctx.replyWithHTML(`<a href="${oauthURL}">Authorize Racó Bot</a>`)
   })
