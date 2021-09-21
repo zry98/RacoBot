@@ -69,12 +69,12 @@ func Init(config Config) {
 	}
 
 	// save bot username
-	BotUsername = b.Me.Username
+	Username = b.Me.Username
 
 	log.Info("Bot OK") // all done, start serving
 }
 
-var BotUsername string
+var Username string
 
 // setWebhook sets the Telegram bot webhook URL to the given one
 func setWebhook(URL string) error {
@@ -122,7 +122,7 @@ func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 			errData, ok := err.(*oauth2.RetrieveError)
 			if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
 				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
-				userID := int64(c.Sender().ID)
+				userID := c.Sender().ID
 				log.WithField("uid", userID).Info(err)
 
 				if err = db.DeleteUser(userID); err != nil {

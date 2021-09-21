@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"RacoBot/internal/db/ratelimiters"
 	"sort"
 	"strconv"
 
@@ -9,6 +8,7 @@ import (
 	tb "gopkg.in/tucnak/telebot.v3"
 
 	"RacoBot/internal/db"
+	rl "RacoBot/internal/db/ratelimiters"
 	"RacoBot/internal/locales"
 	"RacoBot/pkg/fibapi"
 )
@@ -22,8 +22,8 @@ func start(c tb.Context) (err error) {
 // on command `/login`
 // login replies a FIB API OAuth authorization link message for the User
 func login(c tb.Context) (err error) {
-	userID := int64(c.Sender().ID)
-	if !ratelimiters.LoginCommandAllowed(userID) {
+	userID := c.Sender().ID
+	if !rl.LoginCommandAllowed(userID) {
 		log.WithField("uid", userID).Info("login command rate limited")
 		return
 	}
@@ -46,7 +46,6 @@ func login(c tb.Context) (err error) {
 	}
 
 	loginLinkMessage, err := b.Send(&tb.Chat{ID: userID}, &LoginLinkMessage{session})
-	//loginLinkMessage, err := b.sendMessage(userID, LoginLinkMessage{session})
 	if err != nil {
 		log.Error(err)
 		return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
@@ -59,8 +58,7 @@ func login(c tb.Context) (err error) {
 // on command `/whoami`
 // whoami replies the User's full name
 func whoami(c tb.Context) (err error) {
-	userID := int64(c.Sender().ID)
-	reply, err := NewClient(userID).GetFullName()
+	reply, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
 		return
 	}
@@ -71,8 +69,7 @@ func whoami(c tb.Context) (err error) {
 // on command `/logout`
 // logout revokes the User's FIB API OAuth token and deletes it from the database
 func logout(c tb.Context) (err error) {
-	userID := int64(c.Sender().ID)
-	client := NewClient(userID)
+	client := NewClient(c.Sender().ID)
 	if client == nil {
 		return ErrUserNotFound
 	}
@@ -87,13 +84,12 @@ func logout(c tb.Context) (err error) {
 // on command `/debug \d+`
 // debug replies notice message with the given ID in payload
 func debug(c tb.Context) (err error) {
-	userID := int64(c.Sender().ID)
 	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 64)
 	if err != nil {
 		return c.Reply("Invalid payload")
 	}
 
-	client := NewClient(userID)
+	client := NewClient(c.Sender().ID)
 	if client == nil {
 		return ErrUserNotFound
 	}
@@ -111,8 +107,7 @@ func debug(c tb.Context) (err error) {
 // on command `/test`
 // test replies the latest one notice message
 func test(c tb.Context) (err error) {
-	userID := int64(c.Sender().ID)
-	client := NewClient(userID)
+	client := NewClient(c.Sender().ID)
 	if client == nil {
 		return ErrUserNotFound
 	}
@@ -155,7 +150,7 @@ var (
 func setPreferredLanguage(c tb.Context) error {
 	// on command `/lang`, show menu of languages
 	if c.Callback() == nil {
-		user, err := db.GetUser(int64(c.Sender().ID))
+		user, err := db.GetUser(c.Sender().ID)
 		if err != nil {
 			return err
 		}
@@ -169,8 +164,7 @@ func setPreferredLanguage(c tb.Context) error {
 		return c.Reply(locales.Get("").InternalErrorMessage)
 	}
 
-	userID := int64(c.Sender().ID)
-	user, err := db.GetUser(userID)
+	user, err := db.GetUser(c.Sender().ID)
 	if err != nil {
 		return err
 	}
