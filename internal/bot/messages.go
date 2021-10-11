@@ -147,7 +147,7 @@ func (m *NoticeMessage) String() (result string) {
 								log.Error(err)
 								return hr.Stop
 							}
-							if err := e.SetAttribute("href", racoBaseURL + href); err != nil {
+							if err := e.SetAttribute("href", racoBaseURL+href); err != nil {
 								log.Error(err)
 								return hr.Stop
 							}

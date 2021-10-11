@@ -56,7 +56,7 @@ func (c *Client) updateToken() {
 	if newToken.AccessToken != c.User.AccessToken {
 		c.User.AccessToken = newToken.AccessToken
 		c.User.RefreshToken = newToken.RefreshToken
-		c.User.TokenExpiry = newToken.Expiry.Unix() - 60  // TODO: tune the precaution seconds
+		c.User.TokenExpiry = newToken.Expiry.Unix() - 60 // TODO: tune the precaution seconds
 		if err = db.PutUser(c.User); err != nil {
 			log.Error(err)
 			return
