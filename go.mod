@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.8.1
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
-	gopkg.in/tucnak/telebot.v3 v3.0.0-20210913074324-90e7deaa7aa6
+	gopkg.in/tucnak/telebot.v3 v3.0.0-20210930165304-9a08d98f4ee7
 )
 
 require (
