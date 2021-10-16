@@ -31,10 +31,7 @@ type Config struct {
 	WebhookURL string `toml:"webhook_URL"`
 }
 
-func init() {
-	// initialize set preferred language menu
-	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonEN, setLanguageButtonES, setLanguageButtonCA))
-}
+var Username string
 
 // Init initializes the bot
 func Init(config Config) {
@@ -51,16 +48,25 @@ func Init(config Config) {
 	// command handlers
 	b.Handle("/start", start)
 	b.Handle("/login", login)
+	b.Handle("/lang", middleware(setPreferredLanguage))
 	b.Handle("/whoami", middleware(whoami))
+	b.Handle("/test", middleware(test))
 	b.Handle("/logout", middleware(logout))
 	b.Handle("/debug", middleware(debug))
-	b.Handle("/test", middleware(test))
-	b.Handle("/lang", middleware(setPreferredLanguage))
 
-	// inline keyboard button handlers
-	b.Handle(&setLanguageButtonEN, middleware(setPreferredLanguage))
-	b.Handle(&setLanguageButtonES, middleware(setPreferredLanguage))
+	// initialize set preferred language menu
+	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
 	b.Handle(&setLanguageButtonCA, middleware(setPreferredLanguage))
+	b.Handle(&setLanguageButtonES, middleware(setPreferredLanguage))
+	b.Handle(&setLanguageButtonEN, middleware(setPreferredLanguage))
+
+	// set command menus
+	for _, languageCode := range []string{"ca", "es", "en"} {
+		if err = setCommands(locales.Get(languageCode).CommandsMenu, languageCode); err != nil {
+			log.Fatal(err)
+			return
+		}
+	}
 
 	// update webhook URL
 	if err = setWebhook(config.WebhookURL); err != nil {
@@ -73,8 +79,6 @@ func Init(config Config) {
 
 	log.Info("Bot OK") // all done, start serving
 }
-
-var Username string
 
 // setWebhook sets the Telegram bot webhook URL to the given one
 func setWebhook(URL string) error {
@@ -151,4 +155,18 @@ func DeleteLoginLinkMessage(s db.LoginSession) {
 	}); err != nil {
 		log.Error(err)
 	}
+}
+
+// FIXME: remove it when telebot implemented the language_code parameter
+// setCommands changes the list of the bot's commands
+func setCommands(cmds []tb.Command, langCode string) error {
+	params := struct {
+		Commands     []tb.Command `json:"commands"`
+		LanguageCode string       `json:"language_code"`
+	}{
+		Commands:     cmds,
+		LanguageCode: langCode,
+	}
+	_, err := b.Raw("setMyCommands", params)
+	return err
 }

@@ -1,5 +1,7 @@
 package locales
 
+import tb "gopkg.in/tucnak/telebot.v3"
+
 // Locale represents a locale (group of translations)
 type Locale struct {
 	StartMessage                           string
@@ -21,23 +23,24 @@ type Locale struct {
 	LanguageUnavailableErrorMessage        string
 	PreferredLanguageSetMessage            string
 	DecimalSeparator                       rune
+	CommandsMenu                           []tb.Command
 }
 
 var defaultLocale *Locale
 
 func init() {
-	defaultLocale = &en
+	defaultLocale = &es
 }
 
 // Get returns a Locale by the given language code
 func Get(languageCode string) *Locale {
 	switch languageCode {
-	case "en":
-		return &en
-	case "es":
-		return &es
 	case "ca":
 		return &ca
+	case "es":
+		return &es
+	case "en":
+		return &en
 	default:
 		return defaultLocale
 	}

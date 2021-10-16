@@ -1,5 +1,7 @@
 package locales
 
+import tb "gopkg.in/tucnak/telebot.v3"
+
 var en = Locale{
 	StartMessage:                           "Please /login to authorize Racó Bot",
 	AuthorizedResponseBody:                 "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><title>Racó Bot</title></head><body><h1>Authorized</h1><p>You can close the browser and return to Telegram.</p></body></html>",
@@ -20,4 +22,11 @@ var en = Locale{
 	LanguageUnavailableErrorMessage:        "<i>Language unavailable</i>",
 	PreferredLanguageSetMessage:            "The preferred language has been set to English.",
 	DecimalSeparator:                       '.',
+	CommandsMenu: []tb.Command{
+		{Text: "login", Description: "Authorize bot on FIB API"},
+		{Text: "lang", Description: "Select preferred language"},
+		{Text: "whoami", Description: "Check personal information"},
+		{Text: "test", Description: "Show the latest one notice"},
+		{Text: "logout", Description: "De-authorize bot"},
+	},
 }
