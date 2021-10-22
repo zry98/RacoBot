@@ -161,7 +161,7 @@ func setPreferredLanguage(c tb.Context) error {
 	// on callbacks, set language accordingly
 	languageCode := c.Callback().Unique
 	if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
-		return c.Reply(locales.Get("").InternalErrorMessage)
+		return c.Reply(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
 	}
 
 	user, err := db.GetUser(c.Sender().ID)

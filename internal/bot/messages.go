@@ -221,7 +221,7 @@ func (m *NoticeMessage) String() (result string) {
 			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 
-		noun := locale.NoticeMessageAttachmentNounPlural
+		noun := locale.NoticeMessageAttachmentNounSingular
 		if len(m.Attachments) > 1 {
 			noun = locale.NoticeMessageAttachmentNounPlural
 		}
