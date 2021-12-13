@@ -66,7 +66,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go bot.HandleUpdate(update) // use goroutine to handle the update, thus response to the webhook request asap
+	go bot.HandleUpdate(update) // use goroutine to handle the update in the background and return a response to the webhook request ASAP
 
 	fmt.Fprintln(w)
 }
@@ -164,7 +164,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{Text: guideMessage})
 
 	// use Telegram URI to redirect user to the chat
-	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, 301)
+	http.Redirect(w, r, "tg://resolve?domain="+bot.BotUsername, 301)
 	// FIXME: message HTML after failed 301 redirect
 	fmt.Fprintln(w, locales.Get(loginSession.UserLanguageCode).AuthorizedResponseBody)
 }

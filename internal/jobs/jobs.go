@@ -9,12 +9,12 @@ import (
 
 // Config represents a configuration for the jobs
 type Config struct {
-	PushNewNoticesCron string `toml:"push_new_notices_cron"`
+	PushNewNoticesCronExp string `toml:"push_new_notices_cron"`
 }
 
 // Init initializes the jobs
 func Init(config Config) {
-	if config.PushNewNoticesCron != "" {
+	if config.PushNewNoticesCronExp != "" {
 		go RunJobs(config)
 	}
 }
@@ -24,7 +24,7 @@ func RunJobs(config Config) {
 	// TODO: use MQ?
 	defer func() {
 		if err := recover(); err != nil {
-			log.Warn("error recovered in RunJobs ", err)
+			log.Warn("error recovered in RunJobs: ", err)
 		}
 	}()
 
@@ -36,7 +36,7 @@ func RunJobs(config Config) {
 
 	s := gocron.NewScheduler(tzMadrid)
 	s.SetMaxConcurrentJobs(1, gocron.RescheduleMode)
-	_, err = s.Cron(config.PushNewNoticesCron).Tag("PushNewNotices").Do(PushNewNotices)
+	_, err = s.Cron(config.PushNewNoticesCronExp).Tag("PushNewNotices").Do(PushNewNotices)
 	if err != nil {
 		log.Error(err)
 		return

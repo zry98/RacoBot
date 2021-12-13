@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	log "github.com/sirupsen/logrus"
 
 	"RacoBot/internal/bot"
@@ -22,8 +24,10 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 		return
 	}
 
+	waitUntilSecond5() // FIXME: hacky
+
 	for _, userID := range userIDs {
-		checkedUserCount++
+		userLogger := logger.WithField("UID", userID)
 		client := bot.NewClient(userID)
 		if client == nil {
 			bot.SendMessage(userID, locales.Get("en").FIBAPIAuthorizationExpiredErrorMessage)
@@ -36,23 +40,35 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 		newNotices, err := client.GetNewNotices()
 		if err != nil {
 			if err == fibapi.ErrAuthorizationExpired {
-				logger.Infof("FIB API token expired for user %d", userID)
+				userLogger.Infof("FIB API token expired")
 				bot.SendMessage(userID, locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 				if err = db.DeleteUser(userID); err != nil {
 					logger.Error(err)
 				}
 			} else {
-				logger.Errorf("Error getting new notices for user %d, detail: %s", userID, err.Error())
+				userLogger.Errorf("Error fetching new notices: %s", err.Error())
 			}
 			continue
 		}
-		logger.Infof("Fetched %d new notices for user %d", len(newNotices), userID)
+		userLogger.Infof("Fetched %d new notices", len(newNotices))
 
 		for _, n := range newNotices {
 			bot.SendMessage(userID, &n)
-			logger.Infof("Sent new notice %d to user %d", n.ID, userID)
+			userLogger.Infof("Sent new notice %d", n.ID)
 			sentMessageCount++
 		}
+
+		checkedUserCount++
 	}
-	logger.Infof("Done, total checked users: %d, total sent messages: %d", checkedUserCount, sentMessageCount)
+
+	logger.Infof("Done! total checked users: %d, total sent messages: %d", checkedUserCount, sentMessageCount)
+}
+
+// waitUntilSecond5 waits until the current time is at least 5 seconds into the minute
+// its purpose is to avoid fetching notices too early (missing new notices) in case of the clock on FIB API server is slower
+func waitUntilSecond5() {
+	now := time.Now()
+	if now.Second() < 5 {
+		time.Sleep(time.Duration(5-now.Second()) * time.Second)
+	}
 }

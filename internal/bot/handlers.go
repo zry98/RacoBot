@@ -146,9 +146,9 @@ var (
 )
 
 // on command `/lang`, on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
-// setPreferredLanguage replies the menu of preferred languages for the user to choose from, or sets the user's preferred language with the given callback
+// setPreferredLanguage replies the menu of supported languages for the user to choose from, or sets the user's preferred language based on the given callback
 func setPreferredLanguage(c tb.Context) error {
-	// on command `/lang`, show menu of languages
+	// on command `/lang`, show menu for setting preferred language
 	if c.Callback() == nil {
 		user, err := db.GetUser(c.Sender().ID)
 		if err != nil {
@@ -158,7 +158,7 @@ func setPreferredLanguage(c tb.Context) error {
 		return c.Reply(locales.Get(user.LanguageCode).ChoosePreferredLanguageMenuText, setLanguageMenu)
 	}
 
-	// on callbacks, set language accordingly
+	// on callbacks, set the user's preferred language accordingly
 	languageCode := c.Callback().Unique
 	if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
 		return c.Reply(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)

@@ -17,6 +17,7 @@ import (
 )
 
 var b *tb.Bot
+var BotUsername string
 
 type Update tb.Update
 
@@ -30,8 +31,6 @@ type Config struct {
 	Token      string `toml:"token"`
 	WebhookURL string `toml:"webhook_URL"`
 }
-
-var Username string
 
 // Init initializes the bot
 func Init(config Config) {
@@ -54,7 +53,7 @@ func Init(config Config) {
 	b.Handle("/logout", middleware(logout))
 	b.Handle("/debug", middleware(debug))
 
-	// initialize set preferred language menu
+	// initialize menu for setting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
 	b.Handle(&setLanguageButtonCA, middleware(setPreferredLanguage))
 	b.Handle(&setLanguageButtonES, middleware(setPreferredLanguage))
@@ -74,8 +73,8 @@ func Init(config Config) {
 		return
 	}
 
-	// save bot username
-	Username = b.Me.Username
+	// save bot username for later use in callback URL
+	BotUsername = b.Me.Username
 
 	log.Info("Bot OK") // all done, start serving
 }

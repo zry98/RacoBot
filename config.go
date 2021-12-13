@@ -18,7 +18,7 @@ import (
 // Config represents a complete configuration
 type Config struct {
 	Host        string        `toml:"host"`
-	Port        int           `toml:"port"`
+	Port        uint16        `toml:"port"`
 	Log         LogConfig     `toml:"log"`
 	TLS         TLSConfig     `toml:"tls"`
 	Redis       db.Config     `toml:"redis"`

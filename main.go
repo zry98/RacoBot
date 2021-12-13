@@ -44,7 +44,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" {
+	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with HTTPS
 		cert, err := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
 		if err != nil {
 			log.Fatal(err)
@@ -66,7 +66,7 @@ func main() {
 			},
 		}
 		log.Fatal(srv.ListenAndServeTLS("", ""))
-	} else {
+	} else { // without HTTPS
 		log.Fatal(srv.ListenAndServe())
 	}
 }
