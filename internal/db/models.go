@@ -15,7 +15,7 @@ import (
 
 // LoginSession represents a session of login (FIB API OAuth authorization) procedure
 type LoginSession struct {
-	State              string
+	State              string `json:"-"`
 	UserID             int64  `json:"u"`
 	LoginLinkMessageID int64  `json:"m"`
 	UserLanguageCode   string `json:"l"`
