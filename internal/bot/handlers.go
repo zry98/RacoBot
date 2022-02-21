@@ -20,7 +20,7 @@ func start(c tb.Context) (err error) {
 }
 
 // on command `/login`
-// login replies a FIB API OAuth authorization link message for the User
+// login replies a FIB API OAuth authorization link message for the user
 func login(c tb.Context) (err error) {
 	userID := c.Sender().ID
 	if !rl.LoginCommandAllowed(userID) {
@@ -34,11 +34,11 @@ func login(c tb.Context) (err error) {
 		return
 	}
 	if err == nil && user.AccessToken != "" && user.RefreshToken != "" {
-		// already logged-in User
+		// already logged-in user
 		return c.Send(locales.Get(user.LanguageCode).AlreadyLoggedInMessage)
 	}
 
-	// new User
+	// new user
 	session, err := db.NewLoginSession(userID, c.Sender().LanguageCode)
 	if err != nil {
 		log.Error(err)
@@ -56,7 +56,7 @@ func login(c tb.Context) (err error) {
 }
 
 // on command `/whoami`
-// whoami replies the User's full name
+// whoami replies the user's full name
 func whoami(c tb.Context) (err error) {
 	reply, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
@@ -67,7 +67,7 @@ func whoami(c tb.Context) (err error) {
 }
 
 // on command `/logout`
-// logout revokes the User's FIB API OAuth token and deletes it from the database
+// logout revokes the user's FIB API OAuth token and deletes it from the database
 func logout(c tb.Context) (err error) {
 	client := NewClient(c.Sender().ID)
 	if client == nil {

@@ -138,11 +138,11 @@ func middleware(next tb.HandlerFunc) tb.HandlerFunc {
 	}
 }
 
-// SendMessage sends the given message to a Telegram User with the given ID
+// SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) {
 	if _, err := b.Send(&tb.Chat{ID: userID}, message, opt...); err != nil {
-		log.Error(err)
+		log.WithField("message", message).Error(err)
 	}
 }
 

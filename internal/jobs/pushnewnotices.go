@@ -30,7 +30,10 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 		userLogger := logger.WithField("UID", userID)
 		client := bot.NewClient(userID)
 		if client == nil {
-			bot.SendMessage(userID, locales.Get("en").FIBAPIAuthorizationExpiredErrorMessage)
+			// possible database corruption
+			userLogger.Error("Failed to create client")
+			// ask the user to re-login to fix it
+			bot.SendMessage(userID, locales.Get("default").FIBAPIAuthorizationExpiredErrorMessage)
 			if err = db.DeleteUser(userID); err != nil {
 				logger.Error(err)
 			}
@@ -40,7 +43,8 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 		newNotices, err := client.GetNewNotices()
 		if err != nil {
 			if err == fibapi.ErrAuthorizationExpired {
-				userLogger.Infof("FIB API token expired")
+				// notify the user that their FIB API authorization is expired and delete them from DB
+				userLogger.Info("FIB API token expired")
 				bot.SendMessage(userID, locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 				if err = db.DeleteUser(userID); err != nil {
 					logger.Error(err)
