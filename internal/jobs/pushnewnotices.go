@@ -16,7 +16,7 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 	logger := log.WithField("Job", "PushNewNotices")
 	logger.Info("Started")
 
-	var checkedUserCount, sentMessageCount int
+	var checkedUserCount, sentMessageCount uint
 
 	userIDs, err := db.GetUserIDs()
 	if err != nil {

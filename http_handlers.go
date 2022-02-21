@@ -98,7 +98,6 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"ip": r.RemoteAddr,
 			"s":  state,
-			"c":  code,
 		}).Info("Invalid OAuth redirect request (login session not found)")
 
 		w.WriteHeader(http.StatusUnauthorized)
