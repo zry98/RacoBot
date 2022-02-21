@@ -9,7 +9,7 @@ import (
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
 	"RacoBot/internal/locales"

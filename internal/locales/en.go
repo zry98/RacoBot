@@ -1,6 +1,6 @@
 package locales
 
-import tb "gopkg.in/tucnak/telebot.v3"
+import tb "gopkg.in/telebot.v3"
 
 var en = Locale{
 	StartMessage:                           "Please /login to authorize Racó Bot",

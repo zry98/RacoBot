@@ -9,7 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
 	"RacoBot/internal/locales"
@@ -45,19 +45,20 @@ func Init(config Config) {
 	}
 
 	// command handlers
+	b.Use(errorInterceptor())
 	b.Handle("/start", start)
 	b.Handle("/login", login)
-	b.Handle("/lang", middleware(setPreferredLanguage))
-	b.Handle("/whoami", middleware(whoami))
-	b.Handle("/test", middleware(test))
-	b.Handle("/logout", middleware(logout))
-	b.Handle("/debug", middleware(debug))
+	b.Handle("/lang", setPreferredLanguage)
+	b.Handle("/whoami", whoami)
+	b.Handle("/test", test)
+	b.Handle("/logout", logout)
+	b.Handle("/debug", debug)
 
 	// initialize menu for setting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
-	b.Handle(&setLanguageButtonCA, middleware(setPreferredLanguage))
-	b.Handle(&setLanguageButtonES, middleware(setPreferredLanguage))
-	b.Handle(&setLanguageButtonEN, middleware(setPreferredLanguage))
+	b.Handle(&setLanguageButtonCA, setPreferredLanguage)
+	b.Handle(&setLanguageButtonES, setPreferredLanguage)
+	b.Handle(&setLanguageButtonEN, setPreferredLanguage)
 
 	// set command menus
 	for _, languageCode := range []string{"ca", "es", "en"} {
@@ -110,31 +111,34 @@ func setWebhook(URL string) error {
 	return fmt.Errorf("error setting webhook: (code %d) %s", r.ErrorCode, r.Description)
 }
 
-// middleware intercepts and handles the error returned by the next handler
-func middleware(next tb.HandlerFunc) tb.HandlerFunc {
-	return func(c tb.Context) (err error) {
-		defer func() {
-			if err != nil {
-				log.Error(err)
-				err = nil
-			}
-		}()
-
-		err = next(c)
-		if err != nil {
-			errData, ok := err.(*oauth2.RetrieveError)
-			if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
-				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
-				userID := c.Sender().ID
-				log.WithField("uid", userID).Info(err)
-
-				if err = db.DeleteUser(userID); err != nil {
+// errorInterceptor is a middleware that intercepts and handles the error returned by the next handler
+func errorInterceptor() tb.MiddlewareFunc {
+	return func(next tb.HandlerFunc) tb.HandlerFunc {
+		return func(c tb.Context) (err error) {
+			defer func() {
+				// if there is still an error remaining, log it
+				if err != nil {
 					log.Error(err)
+					err = nil
 				}
-				return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
+			}()
+
+			err = next(c)
+			if err != nil {
+				errData, ok := err.(*oauth2.RetrieveError)
+				if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
+					(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
+					userID := c.Sender().ID
+					log.WithField("uid", userID).Info(err)
+
+					if err = db.DeleteUser(userID); err != nil {
+						log.Error(err)
+					}
+					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
+				}
 			}
+			return nil
 		}
-		return nil
 	}
 }
 

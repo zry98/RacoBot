@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
 	rl "RacoBot/internal/db/ratelimiters"
