@@ -315,3 +315,24 @@ func extractMessage(data []byte) (*tb.Message, error) {
 	}
 	return resp.Result, nil
 }
+
+// AnnouncementMessage represents an announcement message to be sent to all users
+type AnnouncementMessage struct {
+	Text string
+}
+
+// Send sends an AnnouncementMessage
+func (m *AnnouncementMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
+	params := map[string]string{
+		"chat_id":    to.Recipient(),
+		"text":       m.Text,
+		"parse_mode": tb.ModeHTML,
+	}
+
+	data, err := b.Raw("sendMessage", params)
+	if err != nil {
+		return nil, err
+	}
+
+	return extractMessage(data)
+}

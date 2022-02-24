@@ -100,14 +100,14 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 			"s":  state,
 		}).Info("Invalid OAuth redirect request (login session not found)")
 
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintln(w, InvalidRequestResponseBody)
 		return
 	}
 	if err != nil {
 		log.Error(err)
 
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, InvalidRequestResponseBody)
 		return
 	}

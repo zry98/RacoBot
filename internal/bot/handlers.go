@@ -3,6 +3,7 @@ package bot
 import (
 	"sort"
 	"strconv"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/telebot.v3"
@@ -175,4 +176,36 @@ func setPreferredLanguage(c tb.Context) error {
 	}
 
 	return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
+}
+
+// on command `/announce`
+// publishAnnouncement publishes and pins the given announcement to all users
+func publishAnnouncement(c tb.Context) (err error) {
+	announcementMessage := &AnnouncementMessage{
+		Text: strings.ReplaceAll(c.Message().Payload, "<br>", "\n"),
+	}
+
+	userIDs, err := db.GetUserIDs()
+	if err != nil {
+		return
+	}
+
+	go func() {
+		var message *tb.Message
+		for _, userID := range userIDs {
+			message, err = b.Send(&tb.Chat{ID: userID}, announcementMessage)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
+			err = b.Pin(message)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+		}
+	}()
+
+	return nil
 }

@@ -40,7 +40,8 @@ func PushNewNotices() { // TODO: use goroutine to send messages concurrently?
 			continue
 		}
 
-		newNotices, err := client.GetNewNotices()
+		var newNotices []bot.NoticeMessage
+		newNotices, err = client.GetNewNotices()
 		if err != nil {
 			if err == fibapi.ErrAuthorizationExpired {
 				// notify the user that their FIB API authorization is expired and delete them from DB

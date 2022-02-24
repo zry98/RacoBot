@@ -17,7 +17,10 @@ import (
 )
 
 var b *tb.Bot
-var BotUsername string
+var (
+	BotUsername string
+	AdminUID    int64
+)
 
 type Update tb.Update
 
@@ -30,6 +33,7 @@ func HandleUpdate(u Update) {
 type Config struct {
 	Token      string `toml:"token"`
 	WebhookURL string `toml:"webhook_URL"`
+	AdminUID   int64  `toml:"admin_UID"`
 }
 
 // Init initializes the bot
@@ -53,6 +57,7 @@ func Init(config Config) {
 	b.Handle("/test", test)
 	b.Handle("/logout", logout)
 	b.Handle("/debug", debug)
+	b.Handle("/announce", publishAnnouncement, adminOnly())
 
 	// initialize menu for setting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
@@ -76,6 +81,9 @@ func Init(config Config) {
 
 	// save bot username for later use in callback URL
 	BotUsername = b.Me.Username
+
+	// save admin UserID for later use in authorization middleware
+	AdminUID = config.AdminUID
 
 	log.Info("Bot OK") // all done, start serving
 }
@@ -144,10 +152,12 @@ func errorInterceptor() tb.MiddlewareFunc {
 
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be used outside the package
-func SendMessage(userID int64, message interface{}, opt ...interface{}) {
-	if _, err := b.Send(&tb.Chat{ID: userID}, message, opt...); err != nil {
-		log.WithField("message", message).Error(err)
+func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
+	sent, err := b.Send(&tb.Chat{ID: userID}, message, opt...)
+	if err != nil {
+		log.Errorf("error sending message to user %d: %s", userID, err)
 	}
+	return sent
 }
 
 // DeleteLoginLinkMessage deletes the login link message of the given login session
@@ -172,4 +182,16 @@ func setCommands(cmds []tb.Command, langCode string) error {
 	}
 	_, err := b.Raw("setMyCommands", params)
 	return err
+}
+
+// adminOnly is a middleware that checks if the sender is admin
+func adminOnly() tb.MiddlewareFunc {
+	return func(next tb.HandlerFunc) tb.HandlerFunc {
+		return func(c tb.Context) (err error) {
+			if c.Sender().ID != AdminUID {
+				return nil
+			}
+			return next(c)
+		}
+	}
 }
