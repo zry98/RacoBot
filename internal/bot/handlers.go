@@ -43,17 +43,22 @@ func login(c tb.Context) (err error) {
 	session, err := db.NewLoginSession(userID, c.Sender().LanguageCode)
 	if err != nil {
 		log.Error(err)
-		return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
+		return
 	}
 
 	loginLinkMessage, err := b.Send(&tb.Chat{ID: userID}, &LoginLinkMessage{session})
 	if err != nil {
 		log.Error(err)
-		return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
+		return
 	}
 	session.LoginLinkMessageID = int64(loginLinkMessage.ID)
 
-	return db.PutLoginSession(session)
+	err = db.PutLoginSession(session)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	return nil
 }
 
 // on command `/whoami`
@@ -61,6 +66,7 @@ func login(c tb.Context) (err error) {
 func whoami(c tb.Context) (err error) {
 	reply, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
+		log.Error(err)
 		return
 	}
 
@@ -76,6 +82,7 @@ func logout(c tb.Context) (err error) {
 	}
 	err = client.Logout()
 	if err != nil {
+		log.Error(err)
 		return
 	}
 
@@ -87,6 +94,7 @@ func logout(c tb.Context) (err error) {
 func debug(c tb.Context) (err error) {
 	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 64)
 	if err != nil {
+		log.Error(err)
 		return c.Reply("Invalid payload")
 	}
 
@@ -99,6 +107,7 @@ func debug(c tb.Context) (err error) {
 		// notice doesn't exist or isn't available to the user
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
 	} else if err != nil {
+		log.Error(err)
 		return
 	}
 
@@ -114,12 +123,14 @@ func test(c tb.Context) (err error) {
 	}
 	notices, noticesHash, err := client.GetNoticesWithHash()
 	if err != nil {
+		log.Error(err)
 		return
 	}
 	if len(notices) == 0 {
 		client.User.LastNoticesHash = noticesHash
 		err = db.PutUser(client.User)
 		if err != nil {
+			log.Error(err)
 			return
 		}
 
@@ -133,6 +144,7 @@ func test(c tb.Context) (err error) {
 	client.User.LastNoticesHash = noticesHash
 	client.User.LastNoticeTimestamp = notices[len(notices)-1].ModifiedAt.Unix()
 	if err = db.PutUser(client.User); err != nil {
+		log.Error(err)
 		return
 	}
 
@@ -148,11 +160,12 @@ var (
 
 // on command `/lang`, on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
 // setPreferredLanguage replies the menu of supported languages for the user to choose from, or sets the user's preferred language based on the given callback
-func setPreferredLanguage(c tb.Context) error {
+func setPreferredLanguage(c tb.Context) (err error) {
 	// on command `/lang`, show menu for setting preferred language
 	if c.Callback() == nil {
 		user, err := db.GetUser(c.Sender().ID)
 		if err != nil {
+			log.Error(err)
 			return err
 		}
 
@@ -167,12 +180,14 @@ func setPreferredLanguage(c tb.Context) error {
 
 	user, err := db.GetUser(c.Sender().ID)
 	if err != nil {
-		return err
+		log.Error(err)
+		return
 	}
 
 	user.LanguageCode = languageCode
 	if err = db.PutUser(user); err != nil {
-		return err
+		log.Error(err)
+		return
 	}
 
 	return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
@@ -187,6 +202,7 @@ func publishAnnouncement(c tb.Context) (err error) {
 
 	userIDs, err := db.GetUserIDs()
 	if err != nil {
+		log.Error(err)
 		return
 	}
 

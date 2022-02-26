@@ -2,12 +2,12 @@ package bot
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"strings"
 
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/telebot.v3"
 
@@ -294,28 +294,6 @@ func (m *SilentMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 	return extractMessage(data)
 }
 
-// copied from telebot to implement Sendable interfaces
-// extractMessage extracts common Message result from given data.
-// Should be called after extractOk or b.Raw() to handle possible errors.
-func extractMessage(data []byte) (*tb.Message, error) {
-	var resp struct {
-		Result *tb.Message
-	}
-	if err := json.Unmarshal(data, &resp); err != nil {
-		var resp struct {
-			Result bool
-		}
-		if err := json.Unmarshal(data, &resp); err != nil {
-			return nil, errors.Wrap(err, "telebot")
-		}
-		if resp.Result {
-			return nil, errors.New("telebot: result is True")
-		}
-		return nil, errors.Wrap(err, "telebot")
-	}
-	return resp.Result, nil
-}
-
 // AnnouncementMessage represents an announcement message to be sent to all users
 type AnnouncementMessage struct {
 	Text string
@@ -335,4 +313,27 @@ func (m *AnnouncementMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptio
 	}
 
 	return extractMessage(data)
+}
+
+// copied from telebot for implementing Sendable interfaces
+// (Source: https://github.com/tucnak/telebot/blob/dd790ca6c1a5b187922415325a2cc2c66e033214/util.go#L110)
+// extractMessage extracts common Message result from given data.
+// Should be called after extractOk or b.Raw() to handle possible errors.
+func extractMessage(data []byte) (*tb.Message, error) {
+	var resp struct {
+		Result *tb.Message
+	}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		var resp struct {
+			Result bool
+		}
+		if err := json.Unmarshal(data, &resp); err != nil {
+			return nil, fmt.Errorf("telebot: %w", err)
+		}
+		if resp.Result {
+			return nil, errors.New("telebot: result is True")
+		}
+		return nil, fmt.Errorf("telebot: %w", err)
+	}
+	return resp.Result, nil
 }

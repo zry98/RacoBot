@@ -145,7 +145,7 @@ func errorInterceptor() tb.MiddlewareFunc {
 					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 				}
 			}
-			return nil
+			return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
 		}
 	}
 }
