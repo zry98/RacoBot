@@ -67,6 +67,7 @@ const (
 	messageMaxLength      int    = 4096
 	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
 	racoBaseURL           string = "https://raco.fib.upc.edu"
+	datetimeLayout        string = "02/01/2006 15:04:05"
 )
 
 // these are the HTML tags Telegram supported
@@ -207,10 +208,12 @@ func (m *NoticeMessage) String() (result string) {
 		result = "\n\n" + html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
+	// prepend subject code, title and publish datetime
 	// TODO: use template
-	result = fmt.Sprintf("[%s] <b>%s</b>%s",
+	result = fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>%s",
 		m.SubjectCode,
 		m.Title,
+		m.PublishedAt.Format(datetimeLayout),
 		result)
 
 	if len(m.Attachments) != 0 {
@@ -234,7 +237,7 @@ func (m *NoticeMessage) String() (result string) {
 			m.Title,
 			fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID))
 	}
-	return result
+	return
 }
 
 // byteCountIEC returns the human-readable file size of the given bytes count
