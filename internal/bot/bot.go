@@ -123,29 +123,24 @@ func setWebhook(URL string) error {
 func errorInterceptor() tb.MiddlewareFunc {
 	return func(next tb.HandlerFunc) tb.HandlerFunc {
 		return func(c tb.Context) (err error) {
-			defer func() {
-				// if there is still an error remaining, log it
-				if err != nil {
-					log.Error(err)
-					err = nil
-				}
-			}()
-
 			err = next(c)
 			if err != nil {
 				errData, ok := err.(*oauth2.RetrieveError)
 				if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
 					(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
 					userID := c.Sender().ID
-					log.WithField("uid", userID).Info(err)
+					log.WithField("UID", userID).Info(err)
 
 					if err = db.DeleteUser(userID); err != nil {
 						log.Error(err)
 					}
 					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
 				}
+				log.Error(err)
+				return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage,
+					&tb.SendOptions{ParseMode: tb.ModeHTML})
 			}
-			return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
+			return nil
 		}
 	}
 }
