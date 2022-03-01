@@ -211,7 +211,7 @@ func (m *NoticeMessage) String() (result string) {
 	// prepend subject code, title and publish datetime
 	// TODO: use template
 	result = fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>%s",
-		m.SubjectCode,
+		strings.TrimPrefix(m.SubjectCode, "#"),
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
 		result)
