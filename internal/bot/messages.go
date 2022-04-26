@@ -205,15 +205,17 @@ func (m *NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", m.ID)
 		}
-		result = "\n\n" + html.UnescapeString(result) // unescape HTML entities like `&#39;`
+		result = html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
 	// prepend subject code, title and publish datetime
 	// TODO: use template
-	result = fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>%s",
+	result = fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s\n\n%s",
 		strings.TrimPrefix(m.SubjectCode, "#"),
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
+		fmt.Sprintf("<a href=\"%s\">%s</a>",
+			fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID), locale.NoticeMessageOriginalLinkText),
 		result)
 
 	if len(m.Attachments) != 0 {
