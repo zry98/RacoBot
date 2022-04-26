@@ -10,6 +10,7 @@ type Locale struct {
 	HelpMessage                            string
 	AlreadyLoggedInMessage                 string
 	LogoutSucceededMessage                 string
+	NoticeMessageOriginalLinkText          string
 	NoticeMessageAttachmentNounSingular    string
 	NoticeMessageAttachmentNounPlural      string
 	NoticeMessageAttachmentIndicator       string

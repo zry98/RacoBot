@@ -9,6 +9,7 @@ var en = Locale{
 	HelpMessage:                            "You can use:\n/test to preview the latest one notice\n/logout to stop receiving messages and revoke the authorization on server.",
 	AlreadyLoggedInMessage:                 "Already logged-in, check /whoami; or, /logout to revoke the authorization.",
 	LogoutSucceededMessage:                 "You have successfully logged out! And the FIB API token has been revoked on server.",
+	NoticeMessageOriginalLinkText:          "Link",
 	NoticeMessageAttachmentNounSingular:    "attachment",
 	NoticeMessageAttachmentNounPlural:      "attachments",
 	NoticeMessageAttachmentIndicator:       "%s\n\n<i>- With %d %s:</i>\n%s",

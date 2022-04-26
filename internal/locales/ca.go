@@ -9,6 +9,7 @@ var ca = Locale{
 	HelpMessage:                            "Feu servir:\n/test per obtenir una vista prèvia de l'últim avís\n/logout per deixar de rebre missatges i revocar l'autorització en el servidor.",
 	AlreadyLoggedInMessage:                 "Ja heu iniciat la sessió, comproveu /whoami; o /logout per revocar l'autorització.",
 	LogoutSucceededMessage:                 "Heu tancat la sessió amb èxit. I el token de FIB API s'ha revocat al servidor.",
+	NoticeMessageOriginalLinkText:          "Enllaç",
 	NoticeMessageAttachmentNounSingular:    "adjunt",
 	NoticeMessageAttachmentNounPlural:      "adjunts",
 	NoticeMessageAttachmentIndicator:       "%s\n\n<i>- Amb %d %s:</i>\n%s",
