@@ -15,9 +15,13 @@ type Config struct {
 	OAuthClientID     string `toml:"oauth_client_id"`
 	OAuthClientSecret string `toml:"oauth_client_secret"`
 	OAuthRedirectURI  string `toml:"oauth_redirect_URI"`
+	PublicClientID    string `toml:"public_client_id"`
 }
 
-var oauthConf *oauth2.Config
+var (
+	oauthConf      *oauth2.Config
+	publicClientID string
+)
 
 // Init initializes the FIB API OAuth configuration instance
 func Init(config Config) {
@@ -32,6 +36,7 @@ func Init(config Config) {
 		RedirectURL: config.OAuthRedirectURI,
 		Scopes:      []string{"read"},
 	}
+	publicClientID = config.PublicClientID
 }
 
 // NewAuthorizationURL generates an authorization URL with the given state

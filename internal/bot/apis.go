@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -95,7 +96,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	}
 
 	for _, n := range res {
-		ns = append(ns, NoticeMessage{n, c.User})
+		ns = append(ns, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
 	}
 	return
 }
@@ -113,7 +114,7 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 		return
 	}
 
-	n = NoticeMessage{res, c.User}
+	n = NoticeMessage{res, c.User, getNoticeLinkURL(res)}
 	return
 }
 
@@ -147,7 +148,7 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
 		for _, n := range res {
 			if n.PublishedAt.Unix() > c.User.LastNoticeTimestamp {
-				ns = append(ns, NoticeMessage{n, c.User})
+				ns = append(ns, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
 			}
 		}
 	}
@@ -172,4 +173,27 @@ func (c *Client) Logout() (err error) {
 
 	err = db.DeleteUser(c.User.ID)
 	return
+}
+
+func getNoticeLinkURL(n fibapi.Notice) string {
+	if strings.HasPrefix(n.SubjectCode, "#") { // special banner notice, not viewable on /avisos/veure.jsp
+		return fmt.Sprintf("%s/#avis-%d", racoBaseURL, n.ID)
+	}
+
+	code, err := db.GetSubjectUPCCode(n.SubjectCode)
+	if err == db.ErrSubjectNotFound {
+		var subject fibapi.PublicSubject
+		subject, err = fibapi.GetPublicSubject(n.SubjectCode)
+		if err != nil {
+			log.Errorf("failed to get subject %s's UPC code: %s", n.SubjectCode, err)
+			return racoBaseURL
+		}
+		code = subject.UPCCode
+
+		err = db.PutSubjectUPCCode(n.SubjectCode, subject.UPCCode)
+		if err != nil {
+			log.Errorf("failed to put subject %s's UPC code %d to DB: %s", n.SubjectCode, subject.UPCCode, err)
+		}
+	}
+	return fmt.Sprintf(racoNoticeURLTemplate, code, n.ID)
 }

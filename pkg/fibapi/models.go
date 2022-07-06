@@ -141,3 +141,26 @@ func (t TimeDate) MarshalJSON() ([]byte, error) {
 	}
 	return []byte(strconv.FormatInt(t.Time.Unix(), 10)), nil
 }
+
+// PublicSubject represents a PublicSubject's API response, or a single subject in a PublicSubjectsResponse
+// Endpoint: /assignatures/{acronym}.json
+type PublicSubject struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"nom"`
+	Acronym      string   `json:"sigles"`
+	UPCCode      int64    `json:"codi_upc"`
+	URL          string   `json:"url"`
+	GuideURL     string   `json:"guia"`
+	Plans        []string `json:"plans"`
+	Obligatories []struct {
+		ObligatoryCode string `json:"codi_oblig"`
+		SpecialityCode string `json:"codi_especialitat"`
+		SpecialityName string `json:"nom_especialitat"`
+		Plan           string `json:"pla"`
+	} `json:"obligatorietats"`
+	Languages    map[string][]string `json:"lang"`
+	Semesters    []string            `json:"quadrimestres"`
+	Semester     string              `json:"semestre"`
+	Credits      float32             `json:"credits"`
+	Availability string              `json:"vigent"`
+}

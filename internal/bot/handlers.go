@@ -148,7 +148,8 @@ func test(c tb.Context) (err error) {
 		return
 	}
 
-	return c.Send(&NoticeMessage{notices[len(notices)-1], client.User})
+	notice := notices[len(notices)-1]
+	return c.Send(&NoticeMessage{notice, client.User, getNoticeLinkURL(notice)})
 }
 
 var (

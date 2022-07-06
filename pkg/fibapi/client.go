@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -53,7 +52,7 @@ func (c *Client) GetNotices() ([]Notice, error) {
 	var notices NoticesResponse
 	err = json.Unmarshal(body, &notices)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing NoticesResponse response: %s\n%s", string(body), err)
+		return nil, fmt.Errorf("error parsing Notices response: %s\n%s", string(body), err)
 	}
 
 	return notices.Results, nil
@@ -69,7 +68,7 @@ func (c *Client) GetNoticesWithHash() ([]Notice, string, error) {
 	var notices NoticesResponse
 	err = json.Unmarshal(body, &notices)
 	if err != nil {
-		return nil, "", fmt.Errorf("error parsing NoticesResponse response: %s\n%s", string(body), err)
+		return nil, "", fmt.Errorf("error parsing Notices response: %s\n%s", string(body), err)
 	}
 
 	return notices.Results, fmt.Sprintf("%08x", crc32.ChecksumIEEE(body)), nil
@@ -100,7 +99,7 @@ func (c *Client) GetSubjects() ([]Subject, error) {
 	var subjects SubjectsResponse
 	err = json.Unmarshal(body, &subjects)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing SubjectsResponse response: %s\n%s", string(body), err)
+		return nil, fmt.Errorf("error parsing Subjects response: %s\n%s", string(body), err)
 	}
 	return subjects.Results, nil
 }
@@ -147,7 +146,7 @@ func (c *Client) request(method, URL string) (body []byte, header http.Header, e
 
 	defer resp.Body.Close()
 	header = resp.Header
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}

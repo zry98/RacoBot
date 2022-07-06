@@ -43,7 +43,8 @@ func (m *LoginLinkMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions)
 // NoticeMessage represents a FIB API Notice message
 type NoticeMessage struct {
 	fibapi.Notice
-	user db.User
+	user    db.User
+	linkURL string
 }
 
 // Send sends a NoticeMessage
@@ -65,7 +66,7 @@ func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 
 const (
 	messageMaxLength      int    = 4096
-	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?assig=GRAU-%s&id=%d" // TODO: use `espai` parameter (UPC subject code)
+	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?espai=%d&id=%d"
 	racoBaseURL           string = "https://raco.fib.upc.edu"
 	datetimeLayout        string = "02/01/2006 15:04:05"
 )
@@ -208,17 +209,13 @@ func (m *NoticeMessage) String() (result string) {
 		result = html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
-	// prepend header (subject code, title and publish datetime)
+	// prepend header (subject code, title, publish datetime and racó link)
 	// TODO: use template
-	linkURL := fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID)
-	if strings.HasPrefix(m.SubjectCode, "#") { // special banner notice, not viewable on /avisos/veure.jsp
-		linkURL = racoBaseURL
-	}
 	header := fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s",
 		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"),
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
-		fmt.Sprintf("<a href=\"%s\">%s</a>", linkURL, locale.NoticeMessageOriginalLinkText))
+		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, locale.NoticeMessageOriginalLinkText))
 	result = fmt.Sprintf("%s\n\n%s", header, result)
 
 	// append attachment list
@@ -239,7 +236,7 @@ func (m *NoticeMessage) String() (result string) {
 
 	// send racó notice URL instead if message length exceeds the limit of 4096 characters
 	if len(result) > messageMaxLength {
-		result = fmt.Sprintf("%s\n\n%s", header, fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, linkURL))
+		result = fmt.Sprintf("%s\n\n%s", header, fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, m.linkURL))
 	}
 	return
 }

@@ -34,14 +34,16 @@ type User struct {
 
 // key prefixes
 const (
-	loginSessionKeyPrefix = "s"
+	loginSessionKeyPrefix = "l"
 	userKeyPrefix         = "u"
+	subjectKeyPrefix      = "s"
 )
 
 // errors
 var (
 	ErrLoginSessionNotFound = errors.New("db: login session not found")
 	ErrUserNotFound         = errors.New("db: user not found")
+	ErrSubjectNotFound      = errors.New("db: subject not found")
 )
 
 // NewLoginSession creates a new login session for a user with the given ID
@@ -144,4 +146,25 @@ func GetUserIDs() (userIDs []int64, err error) {
 		userIDs = append(userIDs, userID)
 	}
 	return
+}
+
+// GetSubjectUPCCode gets the UPC code of the subject with the given acronym
+func GetSubjectUPCCode(acronym string) (code int64, err error) {
+	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+	value, err := rdb.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			err = ErrSubjectNotFound
+		}
+		return
+	}
+	code, err = strconv.ParseInt(value, 10, 32)
+	return
+}
+
+// PutSubjectUPCCode puts the given UPC code of the subject with the given acronym
+func PutSubjectUPCCode(acronym string, code int64) error {
+	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+	value := strconv.FormatInt(code, 10)
+	return rdb.Set(ctx, key, value, 0).Err()
 }
