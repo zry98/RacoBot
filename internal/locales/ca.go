@@ -13,7 +13,7 @@ var ca = Locale{
 	NoticeMessageAttachmentNounSingular:    "adjunt",
 	NoticeMessageAttachmentNounPlural:      "adjunts",
 	NoticeMessageAttachmentIndicator:       "%s\n\n<i>- Amb %d %s:</i>\n%s",
-	NoticeMessageTooLongErrorMessage:       "[%s] <b>%s</b>\n\nHo sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau consulteu-lo a través <a href=\"%s\">d'aquest enllaç</a>.",
+	NoticeMessageTooLongErrorMessage:       "Ho sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau consulteu-lo a través <a href=\"%s\">d'aquest enllaç</a>.",
 	NoticeUnavailableErrorMessage:          "<i>Avís no disponible</i>",
 	NoAvailableNoticesErrorMessage:         "<i>No hi ha avisos disponibles</i>",
 	InternalErrorMessage:                   "<i>Error intern</i>",

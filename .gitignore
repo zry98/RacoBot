@@ -52,3 +52,4 @@ _testmain.go
 .idea
 config.toml
 RacoBot
+.wakatime-project

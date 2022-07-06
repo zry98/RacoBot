@@ -7,6 +7,7 @@ require (
 	github.com/go-co-op/gocron v1.12.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redis/redis_rate/v9 v9.1.2
+	github.com/google/go-cmp v0.5.1
 	github.com/pelletier/go-toml v1.9.5
 	github.com/sirupsen/logrus v1.8.1
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5

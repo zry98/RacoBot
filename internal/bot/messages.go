@@ -208,16 +208,20 @@ func (m *NoticeMessage) String() (result string) {
 		result = html.UnescapeString(result) // unescape HTML entities like `&#39;`
 	}
 
-	// prepend subject code, title and publish datetime
+	// prepend header (subject code, title and publish datetime)
 	// TODO: use template
-	result = fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s\n\n%s",
-		strings.TrimPrefix(m.SubjectCode, "#"),
+	linkURL := fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID)
+	if strings.HasPrefix(m.SubjectCode, "#") { // special banner notice, not viewable on /avisos/veure.jsp
+		linkURL = racoBaseURL
+	}
+	header := fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s",
+		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"),
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
-		fmt.Sprintf("<a href=\"%s\">%s</a>",
-			fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID), locale.NoticeMessageOriginalLinkText),
-		result)
+		fmt.Sprintf("<a href=\"%s\">%s</a>", linkURL, locale.NoticeMessageOriginalLinkText))
+	result = fmt.Sprintf("%s\n\n%s", header, result)
 
+	// append attachment list
 	if len(m.Attachments) != 0 {
 		var sb strings.Builder
 		for _, attachment := range m.Attachments {
@@ -233,11 +237,9 @@ func (m *NoticeMessage) String() (result string) {
 		result = fmt.Sprintf(locale.NoticeMessageAttachmentIndicator, result, len(m.Attachments), noun, sb.String())
 	}
 
-	if len(result) > messageMaxLength { // send Racó notice URL instead if message length exceeds the limit of 4096 characters
-		result = fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage,
-			m.SubjectCode,
-			m.Title,
-			fmt.Sprintf(racoNoticeURLTemplate, m.SubjectCode, m.ID))
+	// send racó notice URL instead if message length exceeds the limit of 4096 characters
+	if len(result) > messageMaxLength {
+		result = fmt.Sprintf("%s\n\n%s", header, fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, linkURL))
 	}
 	return
 }
