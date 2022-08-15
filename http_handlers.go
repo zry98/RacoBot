@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -39,7 +39,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Fatal(err)
 

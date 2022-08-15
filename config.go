@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 
@@ -44,7 +43,7 @@ type TLSConfig struct {
 
 // LoadConfig loads a configuration from the file ./config.toml
 func LoadConfig(path string) (c Config) {
-	f, err := ioutil.ReadFile(path)
+	f, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
