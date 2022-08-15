@@ -39,6 +39,11 @@ const (
 	subjectKeyPrefix      = "s"
 )
 
+// key expirations
+const (
+	subjectUPCCodeKeyExpiration = time.Hour * 24 * 30 // expires in 30 days
+)
+
 // errors
 var (
 	ErrLoginSessionNotFound = errors.New("db: login session not found")
@@ -166,5 +171,5 @@ func GetSubjectUPCCode(acronym string) (code int64, err error) {
 func PutSubjectUPCCode(acronym string, code int64) error {
 	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
 	value := strconv.FormatInt(code, 10)
-	return rdb.Set(ctx, key, value, 0).Err()
+	return rdb.Set(ctx, key, value, subjectUPCCodeKeyExpiration).Err()
 }
