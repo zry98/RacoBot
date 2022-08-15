@@ -20,12 +20,20 @@ const (
 	InternalErrorResponseBody  = "Internal error"
 	RateLimitedResponseBody    = "Rate limited"
 	InvalidRequestResponseBody = "Authorization failed (invalid request)"
+	TelegramRequestTokenHeader = "X-Telegram-Bot-Api-Secret-Token"
 )
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
 func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintln(w, "Invalid request")
+		return
+	}
+
+	// check if request is legit from Telegram
+	if r.Header.Get(TelegramRequestTokenHeader) != bot.SecretToken {
+		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintln(w, "Invalid request")
 		return
 	}

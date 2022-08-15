@@ -1,9 +1,6 @@
 package bot
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -18,6 +15,7 @@ import (
 
 var b *tb.Bot
 var (
+	SecretToken string
 	BotUsername string
 	AdminUID    int64
 )
@@ -31,9 +29,10 @@ func HandleUpdate(u Update) {
 
 // Config represents a configuration for Telegram bot
 type Config struct {
-	Token      string `toml:"token"`
-	WebhookURL string `toml:"webhook_URL"`
-	AdminUID   int64  `toml:"admin_UID"`
+	Token       string `toml:"token"`
+	WebhookURL  string `toml:"webhook_URL"`
+	SecretToken string `toml:"secret_token"`
+	AdminUID    int64  `toml:"admin_UID"`
 }
 
 // Init initializes the bot
@@ -74,10 +73,13 @@ func Init(config Config) {
 	}
 
 	// update webhook URL
-	if err = setWebhook(config.WebhookURL); err != nil {
+	if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
 		log.Fatal(err)
 		return
 	}
+
+	// save secret token for HTTP request authentication
+	SecretToken = config.SecretToken
 
 	// save bot username for later use in callback URL
 	BotUsername = b.Me.Username
@@ -89,34 +91,16 @@ func Init(config Config) {
 }
 
 // setWebhook sets the Telegram bot webhook URL to the given one
-func setWebhook(URL string) error {
-	resp, err := http.Get(fmt.Sprintf("https://api.telegram.org/bot%s/setWebhook?url=%s", b.Token, URL))
-	if err != nil {
-		return err
+func setWebhook(URL string, secretToken string) error {
+	params := struct {
+		URL         string `json:"url"`
+		SecretToken string `json:"secret_token"`
+	}{
+		URL,
+		secretToken,
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error setting webhook (HTTP %d)", resp.StatusCode)
-	}
-
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	var r struct {
-		OK          bool   `json:"ok"`
-		Result      bool   `json:"result,omitempty"`
-		ErrorCode   int    `json:"error_code,omitempty"`
-		Description string `json:"description"`
-	}
-	if err = json.Unmarshal(body, &r); err != nil {
-		return err
-	}
-	if r.OK && r.Result && (r.Description == "Webhook was set" || r.Description == "Webhook is already set") {
-		return nil
-	}
-	return fmt.Errorf("error setting webhook: (code %d) %s", r.ErrorCode, r.Description)
+	_, err := b.Raw("setWebhook", params)
+	return err
 }
 
 // errorInterceptor is a middleware that intercepts and handles the error returned by the next handler
@@ -172,8 +156,8 @@ func setCommands(cmds []tb.Command, langCode string) error {
 		Commands     []tb.Command `json:"commands"`
 		LanguageCode string       `json:"language_code"`
 	}{
-		Commands:     cmds,
-		LanguageCode: langCode,
+		cmds,
+		langCode,
 	}
 	_, err := b.Raw("setMyCommands", params)
 	return err
