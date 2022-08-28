@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"regexp"
 	"strings"
 
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
@@ -71,8 +72,11 @@ const (
 	datetimeLayout        string = "02/01/2006 15:04:05"
 )
 
-// these are the HTML tags Telegram supported
-var supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre"}
+var (
+	htmlCommentRegex = regexp.MustCompile(`<!--.*?-->`)
+	// these are the HTML tags Telegram supported
+	supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre"}
+)
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
 func (m *NoticeMessage) String() (result string) {
@@ -206,7 +210,8 @@ func (m *NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", m.ID)
 		}
-		result = html.UnescapeString(result) // unescape HTML entities like `&#39;`
+		result = html.UnescapeString(result)                   // unescape HTML entities like `&#39;`
+		result = htmlCommentRegex.ReplaceAllString(result, "") // remove HTML comments
 	}
 
 	// prepend header (subject code, title, publish datetime and racó link)
