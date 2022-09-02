@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"regexp"
+	"sort"
 	"strings"
 
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
@@ -74,8 +75,10 @@ const (
 
 var (
 	htmlCommentRegex = regexp.MustCompile(`<!--.*?-->`)
-	// these are the HTML tags Telegram supported
-	supportedTagNames = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre"}
+	// HTML tags currently supported in Telegram API
+	supportedTagNames      = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre", "tg-spoiler"}
+	topLevelListItemPrefix = `  • `
+	nestedListItemPrefix   = `    • `
 )
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
@@ -89,8 +92,8 @@ func (m *NoticeMessage) String() (result string) {
 			&hr.Handlers{
 				ElementContentHandler: []hr.ElementContentHandler{
 					{
-						Selector: "div[class='extraInfo']",
-						// add newlines before exam info titles
+						// add newline before exam title
+						Selector: `div[class="extraInfo"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							if err := e.InsertBeforeStartTagAsText("\n"); err != nil {
 								log.Error(err)
@@ -100,8 +103,8 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "span[id='horaExamen']",
-						// add newlines after exam time data
+						// add newline after exam time
+						Selector: `span[id="horaExamen"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							if err := e.InsertAfterEndTagAsText("\n"); err != nil {
 								log.Error(err)
@@ -111,14 +114,14 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "span[class='label']",
-						// italicize info titles
+						// italicize exam info subtitle
+						Selector: `span[class="label"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if err := e.SetTagName("i"); err != nil {
+							if err := e.RemoveAttribute("class"); err != nil {
 								log.Error(err)
 								return hr.Stop
 							}
-							if err := e.RemoveAttribute("class"); err != nil {
+							if err := e.SetTagName("i"); err != nil {
 								log.Error(err)
 								return hr.Stop
 							}
@@ -130,8 +133,8 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "span[style='text-decoration:underline']",
-						// underlines
+						// fix underline
+						Selector: `span[style="text-decoration:underline"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							if err := e.RemoveAttribute("style"); err != nil {
 								log.Error(err)
@@ -145,8 +148,8 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "a[href^='/']",
-						// links with path-only URL
+						// fix link with path-only URL
+						Selector: `a[href^="/"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							href, err := e.AttributeValue("href")
 							if err != nil {
@@ -161,8 +164,8 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "br",
-						// Telegram doesn't support <br> but \n
+						// Telegram doesn't support `<br>` but `\n`
+						Selector: `br`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							err := e.ReplaceAsText("\n")
 							if err != nil {
@@ -172,16 +175,20 @@ func (m *NoticeMessage) String() (result string) {
 							return hr.Continue
 						},
 					},
+					// Telegram doesn't support lists (`<ul>`, `<ol>` and `<li>`),
+					// so we add a bullet point at the beginning of each item (`<li>`) as an indicator
+					// the following three handlers are for different types of list items
+					// TODO: add numbering to items in ordered lists
 					{
-						Selector: "li",
-						// Telegram doesn't support <ul> & <li>, so add a `- ` at the beginning as an indicator
+						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
+						Selector: `li > ul > li`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							err := e.InsertBeforeStartTagAsText("- ")
+							err := e.InsertBeforeStartTagAsText(nestedListItemPrefix)
 							if err != nil {
 								log.Error(err)
 								return hr.Stop
 							}
-							err = e.InsertAfterEndTagAsText("\n") // newline after each entry
+							err = e.InsertAfterEndTagAsText("\n") // newline after each item
 							if err != nil {
 								log.Error(err)
 								return hr.Stop
@@ -190,13 +197,61 @@ func (m *NoticeMessage) String() (result string) {
 						},
 					},
 					{
-						Selector: "*",
-						// strip all the other tags since Telegram doesn't support them
+						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
+						Selector: `li > ol > li`,
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							err := e.InsertBeforeStartTagAsText(nestedListItemPrefix)
+							if err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							err = e.InsertAfterEndTagAsText("\n") // newline after each item
+							if err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							return hr.Continue
+						},
+					},
+					{
+						// item in top-level list, prepend 2 spaces and a bullet point (`  • `)
+						Selector: `li`,
+						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+							err := e.InsertBeforeStartTagAsText(topLevelListItemPrefix)
+							if err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							err = e.InsertAfterEndTagAsText("\n") // newline after each item
+							if err != nil {
+								log.Error(err)
+								return hr.Stop
+							}
+							return hr.Continue
+						},
+					},
+					{
+						// strip all unsupported tags
+						Selector: `*`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
 							tagName := e.TagName()
 							for _, supportedTagName := range supportedTagNames {
 								if tagName == supportedTagName {
-									return hr.Continue
+									return func() hr.RewriterDirective { // strip all attributes the tag has
+										it := e.AttributeIterator()
+										defer it.Free()
+										for {
+											nextAttrib := it.Next()
+											if nextAttrib == nil || (nextAttrib.Name() == "href" && e.TagName() == "a") {
+												break
+											}
+											if err := e.RemoveAttribute(nextAttrib.Name()); err != nil {
+												log.Error(err)
+												return hr.Stop
+											}
+										}
+										return hr.Continue
+									}()
 								}
 							}
 							e.RemoveAndKeepContent()
@@ -208,7 +263,7 @@ func (m *NoticeMessage) String() (result string) {
 		)
 		if err != nil {
 			log.Fatal(err)
-			return fmt.Sprintf("<i>Internal error</i>\nNotice ID: %d", m.ID)
+			return fmt.Sprintf("<i>Internal error</i>\n\n<a href=\"%s\">%s</a>", m.linkURL, m.linkURL)
 		}
 		result = html.UnescapeString(result)                   // unescape HTML entities like `&#39;`
 		result = htmlCommentRegex.ReplaceAllString(result, "") // remove HTML comments
@@ -225,6 +280,15 @@ func (m *NoticeMessage) String() (result string) {
 
 	// append attachment list
 	if len(m.Attachments) != 0 {
+		noun := locale.NoticeMessageAttachmentNounSingular
+		if len(m.Attachments) > 1 {
+			noun = locale.NoticeMessageAttachmentNounPlural
+			// sort attachments by filename
+			sort.Slice(m.Attachments, func(i, j int) bool {
+				return m.Attachments[i].Name < m.Attachments[j].Name
+			})
+		}
+
 		var sb strings.Builder
 		for _, attachment := range m.Attachments {
 			fileSize := byteCountIEC(attachment.Size)
@@ -232,10 +296,6 @@ func (m *NoticeMessage) String() (result string) {
 			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 
-		noun := locale.NoticeMessageAttachmentNounSingular
-		if len(m.Attachments) > 1 {
-			noun = locale.NoticeMessageAttachmentNounPlural
-		}
 		result = fmt.Sprintf(locale.NoticeMessageAttachmentIndicator, result, len(m.Attachments), noun, sb.String())
 	}
 
