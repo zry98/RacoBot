@@ -58,7 +58,7 @@ type Attachment struct {
 	URL         string   `json:"url"`
 	ModifiedAt  TimeDate `json:"data_modificacio"`
 	Size        int64    `json:"mida"`
-	RedirectURL string
+	RedirectURL string   `json:"__redirect_url,omitempty"`
 }
 
 // UnmarshalJSON adds .RedirectURL (the attachment's FIB API login redirect URL) to the Attachment when it's unmarshalled from JSON
@@ -119,17 +119,24 @@ type TimeDate struct {
 
 const timeDateLayout = "2006-01-02T15:04:05"
 
-var nilTime = (time.Time{}).Unix()
+var (
+	tzMadrid *time.Location
+	nilTime  = (time.Time{}).Unix()
+)
+
+// init initializes the Madrid timezone used for parsing time&date in FIB API response JSONs
+func init() {
+	var err error
+	tzMadrid, err = time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		panic(err)
+	}
+}
 
 // UnmarshalJSON implements the json.Unmarshaler interface for TimeDate type
-// it un-marshals the `2006-01-02T15:04:05`-format time&date strings in the API response JSONs to TimeDate type
-func (t *TimeDate) UnmarshalJSON(b []byte) error {
-	tzMadrid, err := time.LoadLocation("Europe/Madrid")
-	if err != nil {
-		return err
-	}
-
-	t.Time, err = time.ParseInLocation(timeDateLayout, strings.Trim(string(b), "\""), tzMadrid)
+// it un-marshals the `2006-01-02T15:04:05`-format time&date strings to TimeDate type
+func (t *TimeDate) UnmarshalJSON(b []byte) (err error) {
+	t.Time, err = time.ParseInLocation(timeDateLayout, strings.Trim(string(b), `"`), tzMadrid)
 	return err
 }
 

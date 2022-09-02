@@ -6,6 +6,7 @@ import (
 
 // URLs
 const (
+	ServerName = "api.fib.upc.edu"
 	// TODO: build URLs dynamically from BaseURL?
 	BaseURL = "https://api.fib.upc.edu/v2"
 

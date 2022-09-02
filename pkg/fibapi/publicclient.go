@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+var (
+	publicClient   *http.Client
+	publicClientID string
+)
+
 // GetPublicSubject gets a subject with the given acronym from the public API
 func GetPublicSubject(acronym string) (subject PublicSubject, err error) {
 	body, _, err := requestPublic(http.MethodGet, fmt.Sprintf(PublicSubjectURLTemplate, acronym))
@@ -24,20 +29,26 @@ func GetPublicSubject(acronym string) (subject PublicSubject, err error) {
 	return
 }
 
+const clientIDHeader = "client_id"
+
 // requestPublic makes a request to FIB Public API with the given method and URL
 func requestPublic(method, URL string) (body []byte, header http.Header, err error) {
 	req, err := http.NewRequest(method, URL, nil)
 	if err != nil {
 		return
 	}
-	req.Header.Set("client_id", publicClientID)
-	resp, err := http.DefaultClient.Do(req)
+	for k, v := range requestHeaders {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set(clientIDHeader, publicClientID)
+
+	resp, err := publicClient.Do(req)
 	if err != nil {
 		return
 	}
 
-	defer resp.Body.Close()
 	header = resp.Header
+	defer resp.Body.Close()
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return

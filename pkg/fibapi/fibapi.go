@@ -5,7 +5,9 @@ package fibapi
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -19,12 +21,18 @@ type Config struct {
 }
 
 var (
-	oauthConf      *oauth2.Config
-	publicClientID string
+	oauthConf *oauth2.Config
+	// HTTP request headers to send
+	requestHeaders = map[string]string{
+		"Accept":          "application/json",
+		"Accept-Language": "en-US,en;q=0.9",
+		"User-Agent":      "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
+	}
 )
 
-// Init initializes the FIB API OAuth configuration instance
+// Init initializes the FIB API clients
 func Init(config Config) {
+	// private API client
 	oauthConf = &oauth2.Config{
 		ClientID:     config.OAuthClientID,
 		ClientSecret: config.OAuthClientSecret,
@@ -36,7 +44,18 @@ func Init(config Config) {
 		RedirectURL: config.OAuthRedirectURI,
 		Scopes:      []string{"read"},
 	}
+
+	// public API client
 	publicClientID = config.PublicClientID
+	publicClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				ServerName: ServerName,
+			},
+			ForceAttemptHTTP2: false,
+		},
+		Timeout: 10 * time.Second,
+	}
 }
 
 // NewAuthorizationURL generates an authorization URL with the given state

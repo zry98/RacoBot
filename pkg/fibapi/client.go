@@ -116,13 +116,13 @@ func (c *Client) RevokeToken() (err error) {
 	params := url.Values{
 		"client_id": {oauthConf.ClientID},
 		"token":     {token.AccessToken},
-	}
-	_, err = c.Client.Post(OAuthRevokeURL, revokeTokenRequestMimeType, strings.NewReader(params.Encode()))
+	}.Encode()
+	_, err = c.Client.Post(OAuthRevokeURL, revokeTokenRequestMimeType, strings.NewReader(params))
 	return
 }
 
 // GetAttachmentFileData gets the given attachment's file data
-// Be careful: some attachments posted on Racó has copyright and should not be stored nor accessed by third-parties
+// BE CAREFUL: some attachments posted on racó is copyright protected and should not be stored nor accessed by third-parties
 func (c *Client) GetAttachmentFileData(a Attachment) (data io.Reader, err error) {
 	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
 	if err != nil {
@@ -139,13 +139,17 @@ func (c *Client) request(method, URL string) (body []byte, header http.Header, e
 	if err != nil {
 		return
 	}
+	for k, v := range requestHeaders {
+		req.Header.Set(k, v)
+	}
+
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return
 	}
 
-	defer resp.Body.Close()
 	header = resp.Header
+	defer resp.Body.Close()
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return
