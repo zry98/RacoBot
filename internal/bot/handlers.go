@@ -64,13 +64,13 @@ func login(c tb.Context) (err error) {
 // on command `/whoami`
 // whoami replies the user's full name
 func whoami(c tb.Context) (err error) {
-	reply, err := NewClient(c.Sender().ID).GetFullName()
+	fullName, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	return c.Send(reply)
+	return c.Send(fullName)
 }
 
 // on command `/logout`
@@ -89,13 +89,16 @@ func logout(c tb.Context) (err error) {
 	return c.Send(locales.Get(client.User.LanguageCode).LogoutSucceededMessage)
 }
 
-// on command `/debug \d+`
+// on command `/debug <noticeID>`
 // debug replies notice message with the given ID in payload
 func debug(c tb.Context) (err error) {
+	if c.Message().Payload == "" {
+		return
+	}
 	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 64)
 	if err != nil {
 		log.Error(err)
-		return c.Reply("Invalid payload")
+		return c.Reply("Invalid payload (/debug <noticeID>)")
 	}
 
 	client := NewClient(c.Sender().ID)
@@ -159,7 +162,7 @@ var (
 	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
 )
 
-// on command `/lang`, on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
+// on command `/lang` and on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
 // setPreferredLanguage replies the menu of supported languages for the user to choose from, or sets the user's preferred language based on the given callback
 func setPreferredLanguage(c tb.Context) (err error) {
 	// on command `/lang`, show menu for setting preferred language
@@ -224,5 +227,5 @@ func publishAnnouncement(c tb.Context) (err error) {
 		}
 	}()
 
-	return nil
+	return c.Send("Started publishing announcement")
 }
