@@ -12,7 +12,7 @@ var es = Locale{
 	NoticeMessageOriginalLinkText:          "Enlace",
 	NoticeMessageAttachmentNounSingular:    "adjunto",
 	NoticeMessageAttachmentNounPlural:      "adjuntos",
-	NoticeMessageAttachmentIndicator:       "%s\n\n<i>- Con %d %s:</i>\n%s",
+	NoticeMessageAttachmentIndicator:       "%s\n\n<i>📎 Con %d %s:</i>\n%s",
 	NoticeMessageTooLongErrorMessage:       "Lo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href=\"%s\">este enlace</a>.",
 	NoticeUnavailableErrorMessage:          "<i>Aviso no disponible</i>",
 	NoAvailableNoticesErrorMessage:         "<i>No hay avisos disponibles</i>",
