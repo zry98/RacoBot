@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -51,19 +52,14 @@ func main() {
 			return
 		}
 
+		u, err := url.Parse(config.FIBAPI.OAuthRedirectURI)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 		srv.TLSConfig = &tls.Config{
-			MinVersion:               tls.VersionTLS12,
-			Certificates:             []tls.Certificate{cert},
-			CurvePreferences:         []tls.CurveID{tls.X25519, tls.CurveP521, tls.CurveP384, tls.CurveP256},
-			PreferServerCipherSuites: true,
-			CipherSuites: []uint16{
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			},
+			ServerName:   u.Host,
+			Certificates: []tls.Certificate{cert},
 		}
 		log.Fatal(srv.ListenAndServeTLS("", ""))
 	} else { // without HTTPS
