@@ -76,9 +76,11 @@ const (
 var (
 	htmlCommentRegex = regexp.MustCompile(`<!--.*?-->`)
 	// HTML tags currently supported in Telegram API
-	supportedTagNames      = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre", "tg-spoiler"}
-	topLevelListItemPrefix = `  • `
-	nestedListItemPrefix   = `    • `
+	supportedTagNames         = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre", "tg-spoiler"}
+	topLevelListItemPrefix    = `  • `
+	nestedListItemPrefix      = `    • `
+	htmlEntityReplaceExcluder = strings.NewReplacer("&lt;", "&`lt;", "&gt;", "&`gt;", "&amp;", "&`amp;", "&quot;", "&`quot;")
+	htmlEntityReplaceRestorer = strings.NewReplacer("&`lt;", "&lt;", "&`gt;", "&gt;", "&`amp;", "&amp;", "&`quot;", "&quot;")
 )
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
@@ -265,7 +267,12 @@ func (m *NoticeMessage) String() (result string) {
 			log.Fatal(err)
 			return fmt.Sprintf("<i>Internal error</i>\n\n<a href=\"%s\">%s</a>", m.linkURL, m.linkURL)
 		}
-		result = html.UnescapeString(result)                   // unescape HTML entities like `&#39;`
+
+		// unescape HTML entities except `&lt;`, `&gt;`, `&amp;` and `&quot;`
+		result = htmlEntityReplaceExcluder.Replace(result)
+		result = html.UnescapeString(result) // unescape other HTML entities
+		result = htmlEntityReplaceRestorer.Replace(result)
+
 		result = htmlCommentRegex.ReplaceAllString(result, "") // remove HTML comments
 	}
 
