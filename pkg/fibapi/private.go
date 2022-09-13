@@ -14,22 +14,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Client represents a FIB API client initialized with a token
-// the token may be expired, but the underlying client will try to refresh it in later API requests
-type Client struct {
+// PrivateClient represents a FIB API private app client initialized with a token
+// the token may expire, but the underlying client will try to refresh it in later API requests
+type PrivateClient struct {
 	*http.Client
 }
 
-// NewClient initializes a FIB API client with the given OAuth token
-func NewClient(token oauth2.Token) *Client {
+// NewClient initializes a FIB API private client with the given OAuth token
+func NewClient(token oauth2.Token) *PrivateClient {
 	ctx := context.Background()
 	ts := oauthConf.TokenSource(ctx, &token)
 	client := oauth2.NewClient(ctx, ts)
-	return &Client{client}
+	return &PrivateClient{client}
 }
 
 // GetUserInfo gets the user's basic information (username, first name and last name only)
-func (c *Client) GetUserInfo() (userInfo UserInfo, err error) {
+func (c *PrivateClient) GetUserInfo() (userInfo UserInfo, err error) {
 	body, _, err := c.request(http.MethodGet, UserInfoURL)
 	if err != nil {
 		return
@@ -43,7 +43,7 @@ func (c *Client) GetUserInfo() (userInfo UserInfo, err error) {
 }
 
 // GetNotices gets the user's notices
-func (c *Client) GetNotices() ([]Notice, error) {
+func (c *PrivateClient) GetNotices() ([]Notice, error) {
 	body, _, err := c.request(http.MethodGet, NoticesURL)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (c *Client) GetNotices() ([]Notice, error) {
 }
 
 // GetNoticesWithHash gets the user's notices with the response body's hash
-func (c *Client) GetNoticesWithHash() ([]Notice, string, error) {
+func (c *PrivateClient) GetNoticesWithHash() ([]Notice, string, error) {
 	body, _, err := c.request(http.MethodGet, NoticesURL)
 	if err != nil {
 		return nil, "", err
@@ -75,7 +75,7 @@ func (c *Client) GetNoticesWithHash() ([]Notice, string, error) {
 }
 
 // GetNotice gets a specific notice with the given ID
-func (c *Client) GetNotice(ID int64) (Notice, error) {
+func (c *PrivateClient) GetNotice(ID int64) (Notice, error) {
 	notices, err := c.GetNotices()
 	if err != nil {
 		return Notice{}, err
@@ -90,7 +90,7 @@ func (c *Client) GetNotice(ID int64) (Notice, error) {
 }
 
 // GetSubjects gets the user's subjects
-func (c *Client) GetSubjects() ([]Subject, error) {
+func (c *PrivateClient) GetSubjects() ([]Subject, error) {
 	body, _, err := c.request(http.MethodGet, SubjectsURL)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (c *Client) GetSubjects() ([]Subject, error) {
 const revokeTokenRequestMimeType = "application/x-www-form-urlencoded"
 
 // RevokeToken revokes the user's OAuth token
-func (c *Client) RevokeToken() (err error) {
+func (c *PrivateClient) RevokeToken() (err error) {
 	token, err := c.Client.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
 		return
@@ -123,7 +123,7 @@ func (c *Client) RevokeToken() (err error) {
 
 // GetAttachmentFileData gets the given attachment's file data
 // BE CAREFUL: some attachments posted on racó is copyright protected and should not be stored nor accessed by third-parties
-func (c *Client) GetAttachmentFileData(a Attachment) (data io.Reader, err error) {
+func (c *PrivateClient) GetAttachmentFileData(a Attachment) (data io.Reader, err error) {
 	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
 	if err != nil {
 		return
@@ -134,7 +134,7 @@ func (c *Client) GetAttachmentFileData(a Attachment) (data io.Reader, err error)
 }
 
 // request makes a request to FIB API with the given method and URL
-func (c *Client) request(method, URL string) (body []byte, header http.Header, err error) {
+func (c *PrivateClient) request(method, URL string) (body []byte, header http.Header, err error) {
 	req, err := http.NewRequest(method, URL, nil)
 	if err != nil {
 		return

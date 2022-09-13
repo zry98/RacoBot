@@ -16,8 +16,8 @@ import (
 
 // Client represents a FIB API client initialized with a Telegram UserID
 type Client struct {
-	User db.User
-	fibapi.Client
+	fibapi.PrivateClient
+	db.User
 }
 
 // errors
@@ -25,7 +25,7 @@ var (
 	ErrUserNotFound = errors.New("user not found")
 )
 
-// NewClient initializes a FIB API client with the given Telegram UserID
+// NewClient initializes a FIB API private client with the given Telegram UserID
 // if that UserID doesn't exist in the database, it will return nil and leave it for the later API caller to handle
 // thus simplifies its usage to: `xxx, err := NewClient(userID).GetXXX()`
 func NewClient(userID int64) *Client {
@@ -35,20 +35,20 @@ func NewClient(userID int64) *Client {
 	}
 
 	return &Client{
-		User: user,
-		Client: *fibapi.NewClient(oauth2.Token{
+		*fibapi.NewClient(oauth2.Token{
 			AccessToken:  user.AccessToken,
 			RefreshToken: user.RefreshToken,
 			Expiry:       time.Unix(user.TokenExpiry, 0),
 			TokenType:    "Bearer",
 		}),
+		user,
 	}
 }
 
-// updateToken updates the user's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.Client
+// updateToken updates the user's FIB API OAuth token in database if it has been refreshed by the underlying fibapi.PrivateClient
 // it should be called (and should be deferred) in every API caller
 func (c *Client) updateToken() {
-	newToken, err := c.Client.Transport.(*oauth2.Transport).Source.Token()
+	newToken, err := c.PrivateClient.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
 		log.Error(err)
 		return
@@ -57,7 +57,7 @@ func (c *Client) updateToken() {
 	if newToken.AccessToken != c.User.AccessToken {
 		c.User.AccessToken = newToken.AccessToken
 		c.User.RefreshToken = newToken.RefreshToken
-		c.User.TokenExpiry = newToken.Expiry.Unix() - 60 // TODO: tune the precaution seconds
+		c.User.TokenExpiry = newToken.Expiry.Unix() - 10*60 // expire it 10 minutes in advance
 		if err = db.PutUser(c.User); err != nil {
 			log.Error(err)
 			return
@@ -73,7 +73,7 @@ func (c *Client) GetFullName() (fullName string, err error) {
 	}
 	defer c.updateToken()
 
-	res, err := c.Client.GetUserInfo()
+	res, err := c.PrivateClient.GetUserInfo()
 	if err != nil {
 		return
 	}
@@ -90,7 +90,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	res, err := c.Client.GetNotices()
+	res, err := c.PrivateClient.GetNotices()
 	if err != nil {
 		return
 	}
@@ -109,7 +109,7 @@ func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	res, err := c.Client.GetNotice(ID)
+	res, err := c.PrivateClient.GetNotice(ID)
 	if err != nil {
 		return
 	}
@@ -126,7 +126,7 @@ func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	res, noticesHash, err := c.Client.GetNoticesWithHash()
+	res, noticesHash, err := c.PrivateClient.GetNoticesWithHash()
 	if err != nil {
 		return
 	}
@@ -166,7 +166,7 @@ func (c *Client) Logout() (err error) {
 		return
 	}
 
-	err = c.Client.RevokeToken()
+	err = c.PrivateClient.RevokeToken()
 	if err != nil {
 		return
 	}
