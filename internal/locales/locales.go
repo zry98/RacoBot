@@ -27,7 +27,10 @@ type Locale struct {
 	CommandsMenu                           []tb.Command
 }
 
-var defaultLocale *Locale
+var (
+	defaultLocale *Locale
+	LanguageCodes = [...]string{"ca", "es", "en"}
+)
 
 func init() {
 	defaultLocale = &es

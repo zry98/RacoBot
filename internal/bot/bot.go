@@ -13,8 +13,9 @@ import (
 	"RacoBot/pkg/fibapi"
 )
 
-var b *tb.Bot
 var (
+	b *tb.Bot
+
 	SecretToken string
 	BotUsername string
 	AdminUID    int64
@@ -65,7 +66,7 @@ func Init(config Config) {
 	b.Handle(&setLanguageButtonEN, setPreferredLanguage)
 
 	// set command menus
-	for _, languageCode := range []string{"ca", "es", "en"} {
+	for _, languageCode := range locales.LanguageCodes {
 		if err = setCommands(locales.Get(languageCode).CommandsMenu, languageCode); err != nil {
 			log.Fatal(err)
 			return
