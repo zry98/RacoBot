@@ -143,7 +143,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		ID:           loginSession.UserID,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
-		TokenExpiry:  token.Expiry.Unix(),
+		TokenExpiry:  token.Expiry.Unix() - 10*60, // expire it 10 minutes in advance
 		LanguageCode: loginSession.UserLanguageCode,
 	})
 	if err != nil {
