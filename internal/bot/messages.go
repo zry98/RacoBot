@@ -87,8 +87,8 @@ var (
 func (m *NoticeMessage) String() (result string) {
 	locale := locales.Get(m.user.LanguageCode)
 
+	var err error
 	if m.Text != "" {
-		var err error
 		result, err = hr.RewriteString(
 			m.Text,
 			&hr.Handlers{
@@ -97,8 +97,8 @@ func (m *NoticeMessage) String() (result string) {
 						// add newline before exam title
 						Selector: `div[class="extraInfo"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if err := e.InsertBeforeStartTagAsText("\n"); err != nil {
-								log.Error(err)
+							if er := e.InsertBeforeStartTagAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -108,8 +108,8 @@ func (m *NoticeMessage) String() (result string) {
 						// add newline after exam time
 						Selector: `span[id="horaExamen"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if err := e.InsertAfterEndTagAsText("\n"); err != nil {
-								log.Error(err)
+							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -119,16 +119,16 @@ func (m *NoticeMessage) String() (result string) {
 						// italicize exam info subtitle
 						Selector: `span[class="label"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if err := e.RemoveAttribute("class"); err != nil {
-								log.Error(err)
+							if er := e.RemoveAttribute("class"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							if err := e.SetTagName("i"); err != nil {
-								log.Error(err)
+							if er := e.SetTagName("i"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							if err := e.InsertBeforeStartTagAsHTML("- "); err != nil {
-								log.Error(err)
+							if er := e.InsertBeforeStartTagAsHTML("- "); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -138,12 +138,12 @@ func (m *NoticeMessage) String() (result string) {
 						// fix underline
 						Selector: `span[style="text-decoration:underline"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if err := e.RemoveAttribute("style"); err != nil {
-								log.Error(err)
+							if er := e.RemoveAttribute("style"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							if err := e.SetTagName("u"); err != nil {
-								log.Error(err)
+							if er := e.SetTagName("u"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -153,13 +153,13 @@ func (m *NoticeMessage) String() (result string) {
 						// fix link with path-only URL
 						Selector: `a[href^="/"]`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							href, err := e.AttributeValue("href")
-							if err != nil {
-								log.Error(err)
+							href, er := e.AttributeValue("href")
+							if er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							if err := e.SetAttribute("href", racoBaseURL+href); err != nil {
-								log.Error(err)
+							if er = e.SetAttribute("href", racoBaseURL+href); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -169,9 +169,8 @@ func (m *NoticeMessage) String() (result string) {
 						// Telegram doesn't support `<br>` but `\n`
 						Selector: `br`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							err := e.ReplaceAsText("\n")
-							if err != nil {
-								log.Error(err)
+							if er := e.ReplaceAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -185,14 +184,13 @@ func (m *NoticeMessage) String() (result string) {
 						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
 						Selector: `li > ul > li`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							err := e.InsertBeforeStartTagAsText(nestedListItemPrefix)
-							if err != nil {
-								log.Error(err)
+							if er := e.InsertBeforeStartTagAsText(nestedListItemPrefix); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							err = e.InsertAfterEndTagAsText("\n") // newline after each item
-							if err != nil {
-								log.Error(err)
+							// add newline after each item
+							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -202,14 +200,13 @@ func (m *NoticeMessage) String() (result string) {
 						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
 						Selector: `li > ol > li`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							err := e.InsertBeforeStartTagAsText(nestedListItemPrefix)
-							if err != nil {
-								log.Error(err)
+							if er := e.InsertBeforeStartTagAsText(nestedListItemPrefix); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							err = e.InsertAfterEndTagAsText("\n") // newline after each item
-							if err != nil {
-								log.Error(err)
+							// add newline after each item
+							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -219,14 +216,13 @@ func (m *NoticeMessage) String() (result string) {
 						// item in top-level list, prepend 2 spaces and a bullet point (`  • `)
 						Selector: `li`,
 						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							err := e.InsertBeforeStartTagAsText(topLevelListItemPrefix)
-							if err != nil {
-								log.Error(err)
+							if er := e.InsertBeforeStartTagAsText(topLevelListItemPrefix); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
-							err = e.InsertAfterEndTagAsText("\n") // newline after each item
-							if err != nil {
-								log.Error(err)
+							// add newline after each item
+							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
+								log.Error(er)
 								return hr.Stop
 							}
 							return hr.Continue
@@ -247,8 +243,8 @@ func (m *NoticeMessage) String() (result string) {
 											if nextAttrib == nil || (nextAttrib.Name() == "href" && e.TagName() == "a") {
 												break
 											}
-											if err := e.RemoveAttribute(nextAttrib.Name()); err != nil {
-												log.Error(err)
+											if er := e.RemoveAttribute(nextAttrib.Name()); er != nil {
+												log.Error(er)
 												return hr.Stop
 											}
 										}
@@ -274,6 +270,7 @@ func (m *NoticeMessage) String() (result string) {
 		result = htmlEntityReplaceRestorer.Replace(result)
 
 		result = htmlCommentRegex.ReplaceAllString(result, "") // remove HTML comments
+		result = strings.Trim(result, "\n\r")                  // remove trailing newlines
 	}
 
 	// prepend header (subject code, title, publish datetime and racó link)
@@ -298,17 +295,21 @@ func (m *NoticeMessage) String() (result string) {
 
 		var sb strings.Builder
 		for _, attachment := range m.Attachments {
-			fileSize := byteCountIEC(attachment.Size)
-			fileSize = strings.ReplaceAll(fileSize, ".", string(locale.DecimalSeparator))
+			fileSize := strings.ReplaceAll(byteCountIEC(attachment.Size), ".", string(locale.DecimalSeparator))
 			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 
-		result = fmt.Sprintf(locale.NoticeMessageAttachmentIndicator, result, len(m.Attachments), noun, sb.String())
+		result = fmt.Sprintf("%s\n\n%s\n%s",
+			result,
+			fmt.Sprintf(locale.NoticeMessageAttachmentListHeader, len(m.Attachments), noun),
+			strings.TrimSuffix(sb.String(), "\n"))
 	}
 
-	// send racó notice URL instead if message length exceeds the limit of 4096 characters
+	// send racó notice URL instead if message length exceeds the limit
 	if len(result) > messageMaxLength {
-		result = fmt.Sprintf("%s\n\n%s", header, fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, m.linkURL))
+		result = fmt.Sprintf("%s\n\n%s",
+			header,
+			fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, m.linkURL))
 	}
 	return
 }
