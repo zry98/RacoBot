@@ -1,16 +1,16 @@
 module RacoBot
 
-go 1.18
+go 1.19
 
 require (
 	github.com/coolspring8/go-lolhtml v0.2.4
 	github.com/go-co-op/gocron v1.16.2
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redis/redis_rate/v9 v9.1.2
-	github.com/google/go-cmp v0.5.8
-	github.com/pelletier/go-toml/v2 v2.0.2
+	github.com/google/go-cmp v0.5.9
+	github.com/pelletier/go-toml/v2 v2.0.5
 	github.com/sirupsen/logrus v1.9.0
-	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
+	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 	gopkg.in/telebot.v3 v3.0.0
 )
 
