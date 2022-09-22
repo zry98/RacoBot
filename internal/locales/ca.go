@@ -12,7 +12,7 @@ var ca = Locale{
 	NoticeMessageOriginalLinkText:          "Enllaç",
 	NoticeMessageAttachmentNounSingular:    "adjunt",
 	NoticeMessageAttachmentNounPlural:      "adjunts",
-	NoticeMessageAttachmentIndicator:       "%s\n\n<i>📎 Amb %d %s:</i>\n%s",
+	NoticeMessageAttachmentListHeader:      "<i>📎 Amb %d %s:</i>",
 	NoticeMessageTooLongErrorMessage:       "Ho sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau consulteu-lo a través <a href=\"%s\">d'aquest enllaç</a>.",
 	NoticeUnavailableErrorMessage:          "<i>Avís no disponible</i>",
 	NoAvailableNoticesErrorMessage:         "<i>No hi ha avisos disponibles</i>",

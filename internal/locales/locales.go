@@ -13,7 +13,7 @@ type Locale struct {
 	NoticeMessageOriginalLinkText          string
 	NoticeMessageAttachmentNounSingular    string
 	NoticeMessageAttachmentNounPlural      string
-	NoticeMessageAttachmentIndicator       string
+	NoticeMessageAttachmentListHeader      string
 	NoticeMessageTooLongErrorMessage       string
 	NoticeUnavailableErrorMessage          string
 	NoAvailableNoticesErrorMessage         string
