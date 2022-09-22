@@ -167,10 +167,11 @@ var (
 func setPreferredLanguage(c tb.Context) (err error) {
 	// on command `/lang`, show menu for setting preferred language
 	if c.Callback() == nil {
-		user, err := db.GetUser(c.Sender().ID)
+		var user db.User
+		user, err = db.GetUser(c.Sender().ID)
 		if err != nil {
 			log.Error(err)
-			return err
+			return
 		}
 
 		return c.Reply(locales.Get(user.LanguageCode).ChoosePreferredLanguageMenuText, setLanguageMenu)
