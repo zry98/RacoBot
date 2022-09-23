@@ -26,12 +26,13 @@ func init() {
 	db.Init(config.Redis)
 	bot.Init(config.TelegramBot)
 	fibapi.Init(config.FIBAPI)
-
-	jobs.Init(config.JobsConfig)
 }
 
 func main() {
 	defer db.Close()
+
+	jobs.PullSubjectCodes()
+	jobs.Init(config.JobsConfig)
 
 	r := http.NewServeMux()
 	r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)      // Telegram Bot update

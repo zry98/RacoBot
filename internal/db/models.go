@@ -41,7 +41,7 @@ const (
 
 // key expirations
 const (
-	subjectUPCCodeKeyExpiration = time.Hour * 24 * 30 // expires in 30 days
+	subjectUPCCodeKeyExpiration = time.Hour * 24 * 150 // expires in 150 days
 )
 
 // errors
@@ -154,7 +154,7 @@ func GetUserIDs() (userIDs []int64, err error) {
 }
 
 // GetSubjectUPCCode gets the UPC code of the subject with the given acronym
-func GetSubjectUPCCode(acronym string) (code int64, err error) {
+func GetSubjectUPCCode(acronym string) (code uint32, err error) {
 	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
@@ -163,13 +163,27 @@ func GetSubjectUPCCode(acronym string) (code int64, err error) {
 		}
 		return
 	}
-	code, err = strconv.ParseInt(value, 10, 32)
+	i, err := strconv.ParseUint(value, 10, 32)
+	code = uint32(i)
 	return
 }
 
 // PutSubjectUPCCode puts the given UPC code of the subject with the given acronym
-func PutSubjectUPCCode(acronym string, code int64) error {
+func PutSubjectUPCCode(acronym string, code uint32) error {
 	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
-	value := strconv.FormatInt(code, 10)
+	value := strconv.FormatInt(int64(code), 10)
 	return rdb.Set(ctx, key, value, subjectUPCCodeKeyExpiration).Err()
+}
+
+// PutSubjectUPCCodes puts the given subject UPC codes in bulk
+func PutSubjectUPCCodes(codes map[string]uint32) error {
+	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		for acronym, code := range codes {
+			key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+			value := strconv.FormatInt(int64(code), 10)
+			pipe.Set(ctx, key, value, subjectUPCCodeKeyExpiration)
+		}
+		return nil
+	})
+	return err
 }
