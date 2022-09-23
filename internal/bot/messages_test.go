@@ -64,7 +64,7 @@ func TestNoticeMessage_String(t *testing.T) {
 		if err := json.Unmarshal([]byte(tt.raw), &notice); err != nil {
 			t.Error(err)
 		}
-		t.Run(strconv.FormatInt(notice.ID, 10), func(t *testing.T) {
+		t.Run(strconv.FormatInt(int64(notice.ID), 10), func(t *testing.T) {
 			var linkURL string
 			if strings.HasPrefix(notice.SubjectCode, "#") {
 				linkURL = fmt.Sprintf("%s/#avis-%d", racoBaseURL, notice.ID)

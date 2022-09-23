@@ -102,7 +102,7 @@ func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
 }
 
 // GetNotice gets a specific notice message with the given ID
-func (c *Client) GetNotice(ID int64) (n NoticeMessage, err error) {
+func (c *Client) GetNotice(ID int32) (n NoticeMessage, err error) {
 	if c == nil {
 		err = ErrUserNotFound
 		return

@@ -315,12 +315,12 @@ func (m *NoticeMessage) String() (result string) {
 }
 
 // byteCountIEC returns the human-readable file size of the given bytes count
-func byteCountIEC(b int64) string {
+func byteCountIEC(b uint64) string {
 	const unit = 1024
 	if b < unit {
 		return fmt.Sprintf("%d B", b)
 	}
-	div, exp := int64(unit), 0
+	div, exp := uint64(unit), 0
 	for n := b / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++

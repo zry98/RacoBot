@@ -95,7 +95,7 @@ func debug(c tb.Context) (err error) {
 	if c.Message().Payload == "" {
 		return
 	}
-	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 64)
+	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 32)
 	if err != nil {
 		log.Error(err)
 		return c.Reply("Invalid payload (/debug <noticeID>)")
@@ -105,7 +105,7 @@ func debug(c tb.Context) (err error) {
 	if client == nil {
 		return ErrUserNotFound
 	}
-	notice, err := client.GetNotice(noticeID)
+	notice, err := client.GetNotice(int32(noticeID))
 	if err == fibapi.ErrNoticeNotFound || (err == nil && notice.ID == 0) {
 		// notice doesn't exist or isn't available to the user
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
