@@ -12,6 +12,36 @@ var (
 	publicClientID string
 )
 
+// GetPublicSubjects gets all subjects from the public API
+func GetPublicSubjects() (subjects []PublicSubject, err error) {
+	var expectedTotal uint32
+
+	URL := PublicSubjectsURL
+	for {
+		body, _, err := requestPublic(http.MethodGet, URL)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp PublicSubjectsResponse
+		if err = json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("error parsing PublicSubjects response: %s\n%s", string(body), err)
+		}
+
+		expectedTotal = resp.Count
+		subjects = append(subjects, resp.Results...)
+		if resp.NextURL == "" { // all fetched
+			break
+		} else { // fetch next page
+			URL = resp.NextURL
+		}
+	}
+	if uint32(len(subjects)) != expectedTotal {
+		return nil, fmt.Errorf("error fetching PublicSubjects: expected %d, got %d", expectedTotal, len(subjects))
+	}
+	return
+}
+
 // GetPublicSubject gets a subject with the given acronym from the public API
 func GetPublicSubject(acronym string) (subject PublicSubject, err error) {
 	body, _, err := requestPublic(http.MethodGet, fmt.Sprintf(PublicSubjectURLTemplate, acronym))
@@ -22,8 +52,7 @@ func GetPublicSubject(acronym string) (subject PublicSubject, err error) {
 		return
 	}
 
-	err = json.Unmarshal(body, &subject)
-	if err != nil {
+	if err = json.Unmarshal(body, &subject); err != nil {
 		err = fmt.Errorf("error parsing PublicSubject response: %s\n%s", string(body), err)
 	}
 	return
