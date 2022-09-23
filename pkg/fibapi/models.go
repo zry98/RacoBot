@@ -19,21 +19,21 @@ type UserInfo struct {
 // NoticesResponse represents a user's notices API response
 // Endpoint: /jo/avisos.json
 type NoticesResponse struct {
-	Count   int      `json:"count"`
+	Count   uint32   `json:"count"`
 	Results []Notice `json:"results"`
 }
 
 // Notice represents a single notice in a NoticesResponse API response
 type Notice struct {
-	ID          int64        `json:"id"`
-	Title       string       `json:"titol"`
+	ID          int32        `json:"id"` // FIXME: unsigned?
+	CreatedAt   Time         `json:"data_insercio"`
+	ModifiedAt  Time         `json:"data_modificacio"`
+	ExpiresAt   Time         `json:"data_caducitat"`
+	PublishedAt Time         `json:"__published_at,omitempty"`
 	SubjectCode string       `json:"codi_assig"`
+	Title       string       `json:"titol"`
 	Text        string       `json:"text"`
-	CreatedAt   TimeDate     `json:"data_insercio"`
-	ModifiedAt  TimeDate     `json:"data_modificacio"`
-	ExpiresAt   TimeDate     `json:"data_caducitat"`
 	Attachments []Attachment `json:"adjunts"`
-	PublishedAt TimeDate     `json:"__published_at,omitempty"`
 }
 
 // UnmarshalJSON adds .PublishedAt to the Notice when it's unmarshalled from JSON
@@ -53,12 +53,12 @@ func (n *Notice) UnmarshalJSON(b []byte) error {
 
 // Attachment represents a single attachment in a Notice's attachments
 type Attachment struct {
-	MimeTypes   string   `json:"tipus_mime"`
-	Name        string   `json:"nom"`
-	URL         string   `json:"url"`
-	ModifiedAt  TimeDate `json:"data_modificacio"`
-	Size        int64    `json:"mida"`
-	RedirectURL string   `json:"__redirect_url,omitempty"`
+	Size        uint64 `json:"mida"`
+	ModifiedAt  Time   `json:"data_modificacio"`
+	Name        string `json:"nom"`
+	URL         string `json:"url"`
+	MimeTypes   string `json:"tipus_mime"`
+	RedirectURL string `json:"__redirect_url,omitempty"`
 }
 
 // UnmarshalJSON adds .RedirectURL (the attachment's FIB API login redirect URL) to the Attachment when it's unmarshalled from JSON
@@ -77,17 +77,17 @@ func (a *Attachment) UnmarshalJSON(b []byte) error {
 // ScheduleResponse represents a user's schedule API response
 // Endpoint: /jo/classes.json
 type ScheduleResponse struct {
-	Count   int     `json:"count"`
+	Count   uint32  `json:"count"`
 	Results []Class `json:"results"`
 }
 
 // Class represents a single class in a ScheduleResponse API response
 type Class struct {
+	DayOfWeek   uint8  `json:"dia_setmana"`
+	Duration    uint8  `json:"durada"`
 	SubjectCode string `json:"codi_assig"`
 	Group       string `json:"grup"`
-	DayOfWeek   int    `json:"dia_setmana"`
 	StartTime   string `json:"inici"`
-	Duration    int    `json:"durada"`
 	Types       string `json:"tipus"`
 	Classrooms  string `json:"aules"`
 }
@@ -95,25 +95,25 @@ type Class struct {
 // SubjectsResponse represents a user's subjects API response
 // Endpoint: /jo/assignatures.json
 type SubjectsResponse struct {
-	Count   int       `json:"count"`
+	Count   uint32    `json:"count"`
 	Results []Subject `json:"results"`
 }
 
 // Subject represents a single subject in a SubjectsResponse API response
 type Subject struct {
+	UPCCode  uint32  `json:"codi_upc"` // FIXME: signed?
+	Credits  float32 `json:"credits"`
 	ID       string  `json:"id"`
+	Name     string  `json:"nom"`
+	Acronym  string  `json:"sigles"`
 	URL      string  `json:"url"`
 	GuideURL string  `json:"guia"`
 	Group    string  `json:"grup"`
-	Acronym  string  `json:"sigles"`
-	UPCCode  int     `json:"codi_upc"`
 	Semester string  `json:"semestre"`
-	Credits  float32 `json:"credits"`
-	Name     string  `json:"nom"`
 }
 
-// TimeDate represents the time&date data in API response JSONs
-type TimeDate struct {
+// Time represents the time&date data in API response JSONs
+type Time struct {
 	time.Time
 }
 
@@ -133,16 +133,16 @@ func init() {
 	}
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface for TimeDate type
-// it un-marshals the `2006-01-02T15:04:05`-format time&date strings to TimeDate type
-func (t *TimeDate) UnmarshalJSON(b []byte) (err error) {
+// UnmarshalJSON implements the json.Unmarshaler interface for Time type
+// it un-marshals the `2006-01-02T15:04:05`-format time&date strings to Time type
+func (t *Time) UnmarshalJSON(b []byte) (err error) {
 	t.Time, err = time.ParseInLocation(timeDateLayout, strings.Trim(string(b), `"`), tzMadrid)
 	return err
 }
 
-// MarshalJSON implements the json.Marshaler interface for TimeDate type
-// it marshals the values of fields with TimeDate type to UNIX timestamp format
-func (t TimeDate) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements the json.Marshaler interface for Time type
+// it marshals the values of fields with Time type to UNIX timestamp format
+func (t Time) MarshalJSON() ([]byte, error) {
 	if t.Time.Unix() == nilTime {
 		return []byte("nil"), nil
 	}
@@ -152,22 +152,32 @@ func (t TimeDate) MarshalJSON() ([]byte, error) {
 // PublicSubject represents a PublicSubject's API response, or a single subject in a PublicSubjectsResponse
 // Endpoint: /assignatures/{acronym}.json
 type PublicSubject struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"nom"`
-	Acronym      string   `json:"sigles"`
-	UPCCode      int64    `json:"codi_upc"`
-	URL          string   `json:"url"`
-	GuideURL     string   `json:"guia"`
-	Plans        []string `json:"plans"`
+	UPCCode      uint32              `json:"codi_upc"`
+	Credits      float32             `json:"credits"`
+	ID           string              `json:"id"`
+	Name         string              `json:"nom"`
+	Acronym      string              `json:"sigles"`
+	URL          string              `json:"url"`
+	GuideURL     string              `json:"guia"`
+	Semester     string              `json:"semestre"`
+	Availability string              `json:"vigent"`
+	Plans        []string            `json:"plans"`
+	Semesters    []string            `json:"quadrimestres"`
+	Languages    map[string][]string `json:"lang"`
 	Obligatories []struct {
 		ObligatoryCode string `json:"codi_oblig"`
 		SpecialityCode string `json:"codi_especialitat"`
 		SpecialityName string `json:"nom_especialitat"`
 		Plan           string `json:"pla"`
 	} `json:"obligatorietats"`
-	Languages    map[string][]string `json:"lang"`
-	Semesters    []string            `json:"quadrimestres"`
-	Semester     string              `json:"semestre"`
-	Credits      float32             `json:"credits"`
-	Availability string              `json:"vigent"`
+}
+
+// PublicSubjectsResponse represents a public subjects API response
+// // Endpoint: /jo/assignatures.json
+type PublicSubjectsResponse struct {
+	Count       uint32          `json:"count"`
+	Year        string          `json:"curs,omitempty"`
+	NextURL     string          `json:"next,omitempty"`
+	PreviousURL string          `json:"previous,omitempty"`
+	Results     []PublicSubject `json:"results"`
 }

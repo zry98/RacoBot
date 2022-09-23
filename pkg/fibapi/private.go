@@ -75,7 +75,7 @@ func (c *PrivateClient) GetNoticesWithHash() ([]Notice, string, error) {
 }
 
 // GetNotice gets a specific notice with the given ID
-func (c *PrivateClient) GetNotice(ID int64) (Notice, error) {
+func (c *PrivateClient) GetNotice(ID int32) (Notice, error) {
 	notices, err := c.GetNotices()
 	if err != nil {
 		return Notice{}, err

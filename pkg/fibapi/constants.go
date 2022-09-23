@@ -19,6 +19,7 @@ const (
 	NoticesURL               = "https://api.fib.upc.edu/v2/jo/avisos.json"
 	SubjectsURL              = "https://api.fib.upc.edu/v2/jo/assignatures.json"
 	PublicSubjectURLTemplate = "https://api.fib.upc.edu/v2/assignatures/%s.json"
+	PublicSubjectsURL        = "https://api.fib.upc.edu/v2/assignatures.json"
 
 	LoginRedirectBaseURL = "https://api.fib.upc.edu/v2/accounts/login/?next="
 )
