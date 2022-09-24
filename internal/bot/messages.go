@@ -2,7 +2,6 @@ package bot
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html"
 	"regexp"
@@ -68,8 +67,8 @@ func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*
 
 const (
 	messageMaxLength      int    = 4096
-	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?espai=%d&id=%d"
 	racoBaseURL           string = "https://raco.fib.upc.edu"
+	racoNoticeURLTemplate string = "https://raco.fib.upc.edu/avisos/veure.jsp?espai=%d&id=%d"
 	datetimeLayout        string = "02/01/2006 15:04:05"
 )
 
@@ -87,8 +86,15 @@ var (
 func (m *NoticeMessage) String() (result string) {
 	locale := locales.Get(m.user.LanguageCode)
 
-	var err error
+	header := fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s",
+		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"), // telegram tags can't contain dashes
+		m.Title,
+		m.PublishedAt.Format(datetimeLayout),
+		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, locale.NoticeMessageOriginalLinkText))
+
+	// format body text
 	if m.Text != "" {
+		var err error
 		result, err = hr.RewriteString(
 			m.Text,
 			&hr.Handlers{
@@ -260,11 +266,12 @@ func (m *NoticeMessage) String() (result string) {
 			},
 		)
 		if err != nil {
-			log.Fatal(err)
-			return fmt.Sprintf("<i>Internal error</i>\n\n<a href=\"%s\">%s</a>", m.linkURL, m.linkURL)
+			log.Errorf("error while rewriting notice message text HTML: %v", err)
+			return fmt.Sprintf("%s\n\n%s", header, locale.InternalErrorMessage)
 		}
 
 		// unescape HTML entities except `&lt;`, `&gt;`, `&amp;` and `&quot;`
+		// FIXME: too janky
 		result = htmlEntityReplaceExcluder.Replace(result)
 		result = html.UnescapeString(result) // unescape other HTML entities
 		result = htmlEntityReplaceRestorer.Replace(result)
@@ -273,16 +280,9 @@ func (m *NoticeMessage) String() (result string) {
 		result = strings.Trim(result, "\n\r")                  // remove trailing newlines
 	}
 
-	// prepend header (subject code, title, publish datetime and racó link)
-	// TODO: use template
-	header := fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s",
-		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"),
-		m.Title,
-		m.PublishedAt.Format(datetimeLayout),
-		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, locale.NoticeMessageOriginalLinkText))
 	result = fmt.Sprintf("%s\n\n%s", header, result)
 
-	// append attachment list
+	// append attachments if there are any
 	if len(m.Attachments) != 0 {
 		noun := locale.NoticeMessageAttachmentNounSingular
 		if len(m.Attachments) > 1 {
@@ -389,13 +389,20 @@ func (m *AnnouncementMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptio
 		return nil, err
 	}
 
-	return extractMessage(data)
+	msg, err := extractMessage(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// pin it
+	err = b.Pin(msg)
+	return msg, err
 }
 
-// copied from telebot for implementing Sendable interfaces
-// (Source: https://github.com/tucnak/telebot/blob/dd790ca6c1a5b187922415325a2cc2c66e033214/util.go#L110)
 // extractMessage extracts common Message result from given data.
 // Should be called after extractOk or b.Raw() to handle possible errors.
+// copied from telebot for implementing Sendable interfaces
+// (Source: https://github.com/tucnak/telebot/blob/dd790ca6c1a5b187922415325a2cc2c66e033214/util.go#L110)
 func extractMessage(data []byte) (*tb.Message, error) {
 	var resp struct {
 		Result *tb.Message
@@ -408,7 +415,7 @@ func extractMessage(data []byte) (*tb.Message, error) {
 			return nil, fmt.Errorf("telebot: %w", err)
 		}
 		if resp.Result {
-			return nil, errors.New("telebot: result is True")
+			return nil, fmt.Errorf("telebot: result is True")
 		}
 		return nil, fmt.Errorf("telebot: %w", err)
 	}

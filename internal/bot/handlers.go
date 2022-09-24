@@ -1,9 +1,9 @@
 package bot
 
 import (
-	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/telebot.v3"
@@ -15,17 +15,17 @@ import (
 )
 
 // on command `/start`
-// start replies a `/login` message
+// start replies with a `/login` message
 func start(c tb.Context) (err error) {
 	return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage) // TODO: make it nicer
 }
 
 // on command `/login`
-// login replies a FIB API OAuth authorization link message for the user
+// login replies with a FIB API OAuth authorization link message for the user
 func login(c tb.Context) (err error) {
 	userID := c.Sender().ID
 	if !rl.LoginCommandAllowed(userID) {
-		log.WithField("uid", userID).Info("login command rate limited")
+		log.WithField("UID", userID).Info("login command rate-limited")
 		return
 	}
 
@@ -53,8 +53,7 @@ func login(c tb.Context) (err error) {
 	}
 	session.LoginLinkMessageID = int64(loginLinkMessage.ID)
 
-	err = db.PutLoginSession(session)
-	if err != nil {
+	if err = db.PutLoginSession(session); err != nil {
 		log.Error(err)
 		return
 	}
@@ -62,14 +61,16 @@ func login(c tb.Context) (err error) {
 }
 
 // on command `/whoami`
-// whoami replies the user's full name
+// whoami replies with the user's full name
 func whoami(c tb.Context) (err error) {
 	fullName, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
-		log.Error(err)
+		if err == ErrUserNotFound {
+			return
+		}
+		log.Errorf("failed to get full name of user %d: %v", c.Sender().ID, err)
 		return
 	}
-
 	return c.Send(fullName)
 }
 
@@ -80,24 +81,23 @@ func logout(c tb.Context) (err error) {
 	if client == nil {
 		return ErrUserNotFound
 	}
-	err = client.Logout()
-	if err != nil {
-		log.Error(err)
-		return
+	if err = client.Logout(); err != nil {
+		log.Errorf("failed to logout user %d: %v", c.Sender().ID, err)
+		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).LogoutFailedMessage})
 	}
-
 	return c.Send(locales.Get(client.User.LanguageCode).LogoutSucceededMessage)
 }
 
 // on command `/debug <noticeID>`
-// debug replies notice message with the given ID in payload
+// debug replies with a notice with the given ID in payload
 func debug(c tb.Context) (err error) {
-	if c.Message().Payload == "" {
+	payload := c.Message().Payload
+	if payload == "" {
 		return
 	}
-	noticeID, err := strconv.ParseInt(c.Message().Payload, 10, 32)
+	noticeID, err := strconv.ParseInt(payload, 10, 32)
 	if err != nil {
-		log.Error(err)
+		log.Debugf("failed to parse notice ID %s: %v", payload, err)
 		return c.Reply("Invalid payload (/debug <noticeID>)")
 	}
 
@@ -109,124 +109,103 @@ func debug(c tb.Context) (err error) {
 	if err == fibapi.ErrNoticeNotFound || (err == nil && notice.ID == 0) {
 		// notice doesn't exist or isn't available to the user
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
-	} else if err != nil {
-		log.Error(err)
+	}
+	if err != nil {
+		log.Errorf("failed to get notice %d: %v", noticeID, err)
 		return
 	}
-
 	return c.Send(&notice)
 }
 
 // on command `/test`
-// test replies the latest one notice message
+// test replies with the user's latest one notice
 func test(c tb.Context) (err error) {
 	client := NewClient(c.Sender().ID)
 	if client == nil {
 		return ErrUserNotFound
 	}
-	notices, noticesHash, err := client.GetNoticesWithHash()
+	notices, digest, err := client.GetNoticesWithDigest()
 	if err != nil {
-		log.Error(err)
+		log.Errorf("failed to get notices of user %d: %v", c.Sender().ID, err)
 		return
 	}
-	if len(notices) == 0 {
-		client.User.LastNoticesHash = noticesHash
-		err = db.PutUser(client.User)
-		if err != nil {
-			log.Error(err)
-			return
+	defer func() { // save states to DB by the way
+		client.User.LastNoticesDigest = digest
+		if len(notices) > 0 {
+			client.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
 		}
+		if err = db.PutUser(client.User); err != nil {
+			log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
+		}
+	}()
 
+	if len(notices) == 0 {
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoAvailableNoticesErrorMessage})
 	}
-
-	sort.Slice(notices, func(i, j int) bool {
-		return notices[i].ModifiedAt.Unix() < notices[j].ModifiedAt.Unix()
-	})
-
-	client.User.LastNoticesHash = noticesHash
-	client.User.LastNoticeTimestamp = notices[len(notices)-1].ModifiedAt.Unix()
-	if err = db.PutUser(client.User); err != nil {
-		log.Error(err)
-		return
-	}
-
-	notice := notices[len(notices)-1]
-	return c.Send(&NoticeMessage{notice, client.User, getNoticeLinkURL(notice)})
+	latestNotice := notices[len(notices)-1]
+	return c.Send(&NoticeMessage{latestNotice, client.User, getNoticeLinkURL(latestNotice)})
 }
 
-var (
-	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
-	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
-	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
-	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
-)
-
 // on command `/lang` and on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
-// setPreferredLanguage replies the menu of supported languages for the user to choose from, or sets the user's preferred language based on the given callback
+// setPreferredLanguage replies with the menu of supported languages for the user to select from on command,
+// or sets the user's preferred language when on callbacks
 func setPreferredLanguage(c tb.Context) (err error) {
-	// on command `/lang`, show menu for setting preferred language
-	if c.Callback() == nil {
-		var user db.User
-		user, err = db.GetUser(c.Sender().ID)
-		if err != nil {
-			log.Error(err)
+	user, e := db.GetUser(c.Sender().ID)
+	if e != nil {
+		if e == db.ErrUserNotFound {
 			return
 		}
-
-		return c.Reply(locales.Get(user.LanguageCode).ChoosePreferredLanguageMenuText, setLanguageMenu)
-	}
-
-	// on callbacks, set the user's preferred language accordingly
-	languageCode := c.Callback().Unique
-	if languageCode == "" || (languageCode != "en" && languageCode != "es" && languageCode != "ca") {
-		return c.Reply(locales.Get(c.Sender().LanguageCode).InternalErrorMessage)
-	}
-
-	user, err := db.GetUser(c.Sender().ID)
-	if err != nil {
-		log.Error(err)
+		log.Fatalf("failed to get user %d: %v", c.Sender().ID, e)
 		return
 	}
 
-	user.LanguageCode = languageCode
+	// on command `/lang`, show the menu for selecting language
+	if c.Callback() == nil {
+		return c.Reply(locales.Get(user.LanguageCode).SelectPreferredLanguageMenuText, setLanguageMenu)
+	}
+
+	// on callbacks, set the user's preferred language with the given button data
+	langCode := c.Callback().Unique
+	if langCode == "" || (langCode != "en" && langCode != "es" && langCode != "ca") {
+		return c.Reply(&ErrorMessage{locales.Get(c.Sender().LanguageCode).LanguageUnavailableErrorMessage})
+	}
+	user.LanguageCode = langCode
 	if err = db.PutUser(user); err != nil {
-		log.Error(err)
+		log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
 		return
 	}
-
-	return c.Edit(locales.Get(languageCode).PreferredLanguageSetMessage)
+	return c.Edit(locales.Get(langCode).PreferredLanguageSetMessage)
 }
 
 // on command `/announce`
-// publishAnnouncement publishes and pins the given announcement to all users
+// publishAnnouncement publishes and pins the given announcement to all users in database
 func publishAnnouncement(c tb.Context) (err error) {
-	announcementMessage := &AnnouncementMessage{
+	m := AnnouncementMessage{
 		Text: strings.ReplaceAll(c.Message().Payload, "<br>", "\n"),
 	}
 
-	userIDs, err := db.GetUserIDs()
-	if err != nil {
-		log.Error(err)
-		return
-	}
+	go func(announcement AnnouncementMessage) {
+		logger := log.WithField("job", "PublishAnnouncement")
+		count := 0
 
-	go func() {
-		var message *tb.Message
-		for _, userID := range userIDs {
-			message, err = b.Send(&tb.Chat{ID: userID}, announcementMessage)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
-
-			err = b.Pin(message)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
+		userIDs, e := db.GetAllUserIDs()
+		if e != nil {
+			logger.Errorf("failed to get all user IDs: %v", e)
+			return
 		}
-	}()
+		logger.Infof("found %d users", len(userIDs))
+
+		startTime := time.Now()
+		for _, userID := range userIDs {
+			if _, e = b.Send(tb.ChatID(userID), &announcement); e != nil {
+				logger.Errorf("failed to send announcement to user %d: %v", userID, e)
+				continue
+			}
+			count++
+		}
+
+		logger.Infof("sent announcement to %d/%d users in %v", count, len(userIDs), time.Since(startTime))
+	}(m)
 
 	return c.Send("Started publishing announcement")
 }

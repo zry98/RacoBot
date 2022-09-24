@@ -1,9 +1,7 @@
 package bot
 
 import (
-	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -22,7 +20,7 @@ type Client struct {
 
 // errors
 var (
-	ErrUserNotFound = errors.New("user not found")
+	ErrUserNotFound = fmt.Errorf("user not found")
 )
 
 // NewClient initializes a FIB API private client with the given Telegram UserID
@@ -50,18 +48,19 @@ func NewClient(userID int64) *Client {
 func (c *Client) updateToken() {
 	newToken, err := c.PrivateClient.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
-		log.Error(err)
+		log.Errorf("failed to extract token from user %d: %v", c.User.ID, err)
 		return
 	}
 
-	if newToken.AccessToken != c.User.AccessToken {
-		c.User.AccessToken = newToken.AccessToken
-		c.User.RefreshToken = newToken.RefreshToken
-		c.User.TokenExpiry = newToken.Expiry.Unix() - 10*60 // expire it 10 minutes in advance
-		if err = db.PutUser(c.User); err != nil {
-			log.Error(err)
-			return
-		}
+	if newToken.AccessToken == c.User.AccessToken && newToken.RefreshToken == c.User.RefreshToken {
+		return
+	}
+	c.User.AccessToken = newToken.AccessToken
+	c.User.RefreshToken = newToken.RefreshToken
+	c.User.TokenExpiry = newToken.Expiry.Unix() - 10*60 // expire it 10 minutes in advance
+	if err = db.PutUser(c.User); err != nil {
+		log.Errorf("failed to put user %d: %v", c.User.ID, err)
+		return
 	}
 }
 
@@ -73,126 +72,135 @@ func (c *Client) GetFullName() (fullName string, err error) {
 	}
 	defer c.updateToken()
 
-	res, err := c.PrivateClient.GetUserInfo()
+	userInfo, err := c.PrivateClient.GetUserInfo()
 	if err != nil {
 		return
 	}
 
-	fullName = fmt.Sprintf("%s %s", res.FirstName, res.LastNames)
+	fullName = fmt.Sprintf("%s %s", userInfo.FirstName, userInfo.LastNames)
 	return
 }
 
 // GetNotices gets the user's notice messages
-func (c *Client) GetNotices() (ns []NoticeMessage, err error) {
+func (c *Client) GetNotices() (messages []NoticeMessage, err error) {
 	if c == nil {
 		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
 
-	res, err := c.PrivateClient.GetNotices()
+	notices, err := c.PrivateClient.GetNotices()
 	if err != nil {
 		return
 	}
 
-	for _, n := range res {
-		ns = append(ns, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
+	messages = make([]NoticeMessage, 0, len(notices))
+	for _, notice := range notices {
+		messages = append(messages, NoticeMessage{notice, c.User, getNoticeLinkURL(notice)})
 	}
 	return
 }
 
 // GetNotice gets a specific notice message with the given ID
-func (c *Client) GetNotice(ID int32) (n NoticeMessage, err error) {
+func (c *Client) GetNotice(ID int32) (message NoticeMessage, err error) {
 	if c == nil {
 		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
 
-	res, err := c.PrivateClient.GetNotice(ID)
+	notice, err := c.PrivateClient.GetNotice(ID)
 	if err != nil {
 		return
 	}
 
-	n = NoticeMessage{res, c.User, getNoticeLinkURL(res)}
+	message = NoticeMessage{notice, c.User, getNoticeLinkURL(notice)}
 	return
 }
 
 // GetNewNotices gets the user's new notice messages
-func (c *Client) GetNewNotices() (ns []NoticeMessage, err error) {
+func (c *Client) GetNewNotices() (messages []NoticeMessage, err error) {
 	if c == nil {
 		err = ErrUserNotFound
 		return
 	}
 	defer c.updateToken()
 
-	res, noticesHash, err := c.PrivateClient.GetNoticesWithHash()
+	notices, noticesHash, err := c.PrivateClient.GetNoticesWithDigest()
 	if err != nil {
 		return
 	}
 
-	if noticesHash == c.User.LastNoticesHash { // no change at all
+	if noticesHash == c.User.LastNoticesDigest { // no change at all
 		return
 	}
 
-	if len(res) == 0 { // no available notices (mostly due to the new semester not started)
-		c.User.LastNoticesHash = noticesHash
-		err = db.PutUser(c.User)
+	if len(notices) == 0 { // no available notices (mostly due to the new semester not started)
+		c.User.LastNoticesDigest = noticesHash
+		if err = db.PutUser(c.User); err != nil {
+			err = fmt.Errorf("failed to put user: %w", err)
+		}
 		return
 	}
 
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].PublishedAt.Before(res[j].PublishedAt.Time)
-	})
-
-	if c.User.LastNoticesHash != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
-		for _, n := range res {
+	if c.User.LastNoticesDigest != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
+		messages = make([]NoticeMessage, 0, len(notices))
+		for _, n := range notices {
 			if n.PublishedAt.Unix() > c.User.LastNoticeTimestamp {
-				ns = append(ns, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
+				messages = append(messages, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
 			}
 		}
 	}
 
-	c.User.LastNoticesHash = noticesHash
-	c.User.LastNoticeTimestamp = res[len(res)-1].PublishedAt.Unix()
-	err = db.PutUser(c.User)
+	c.User.LastNoticesDigest = noticesHash
+	c.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
+	if err = db.PutUser(c.User); err != nil {
+		err = fmt.Errorf("failed to put user: %w", err)
+	}
 	return
 }
 
 // Logout revokes the user's OAuth token and deletes it from the database
-func (c *Client) Logout() (err error) {
+func (c *Client) Logout() error {
 	if c == nil {
-		err = ErrUserNotFound
-		return
+		return ErrUserNotFound
 	}
 
-	err = c.PrivateClient.RevokeToken()
-	if err != nil {
-		return
+	if err := c.PrivateClient.RevokeToken(); err != nil {
+		return fmt.Errorf("failed to revoke token: %w", err)
 	}
 
-	err = db.DeleteUser(c.User.ID)
-	return
+	if err := db.DeleteUser(c.User.ID); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
 }
 
 func getNoticeLinkURL(n fibapi.Notice) string {
-	if strings.HasPrefix(n.SubjectCode, "#") { // special banner notice, not viewable on /avisos/veure.jsp
+	if strings.HasPrefix(n.SubjectCode, "#") {
+		// special banner notice, not viewable on /avisos/veure.jsp
 		return fmt.Sprintf("%s/#avis-%d", racoBaseURL, n.ID)
 	}
 
 	code, err := db.GetSubjectUPCCode(n.SubjectCode)
-	if err == db.ErrSubjectNotFound {
-		var subject fibapi.PublicSubject
-		subject, err = fibapi.GetPublicSubject(n.SubjectCode)
-		if err != nil {
-			log.Errorf("failed to get subject %s's UPC code: %s", n.SubjectCode, err)
-			return racoBaseURL
-		}
-		code = subject.UPCCode
+	if err != nil {
+		if err == db.ErrSubjectNotFound {
+			// not found in DB, try to get the code from FIB API
+			subject, e := fibapi.GetPublicSubject(n.SubjectCode)
+			if e != nil {
+				log.Errorf("failed to get UPC code of %s from API: %v", n.SubjectCode, e)
+				return racoBaseURL
+			}
 
-		err = db.PutSubjectUPCCode(n.SubjectCode, subject.UPCCode)
-		if err != nil {
-			log.Errorf("failed to put subject %s's UPC code %d to DB: %s", n.SubjectCode, subject.UPCCode, err)
+			code = subject.UPCCode
+			// save it to DB by the way
+			if e = db.PutSubjectUPCCode(n.SubjectCode, subject.UPCCode); e != nil {
+				log.Errorf("failed to put UPC code of %s: %v", n.SubjectCode, e)
+			}
+		} else {
+			// DB error
+			log.Errorf("failed to get UPC code of %s: %v", n.SubjectCode, err)
+			return racoBaseURL
 		}
 	}
 	return fmt.Sprintf(racoNoticeURLTemplate, code, n.ID)
