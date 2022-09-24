@@ -1,7 +1,6 @@
 package fibapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"golang.org/x/oauth2"
@@ -30,55 +30,52 @@ func NewClient(token oauth2.Token) *PrivateClient {
 
 // GetUserInfo gets the user's basic information (username, first name and last name only)
 func (c *PrivateClient) GetUserInfo() (userInfo UserInfo, err error) {
-	body, _, err := c.request(http.MethodGet, UserInfoURL)
+	body, _, err := c.request(http.MethodGet, userInfoURL)
 	if err != nil {
+		err = fmt.Errorf("error getting UserInfo: %w", err)
 		return
 	}
 
-	err = json.Unmarshal(body, &userInfo)
-	if err != nil {
-		err = fmt.Errorf("error parsing UserInfo response: %s\n%s", string(body), err)
+	if err = json.Unmarshal(body, &userInfo); err != nil {
+		err = fmt.Errorf("error parsing UserInfo: %w\n%s", err, string(body))
 	}
 	return
 }
 
 // GetNotices gets the user's notices
-func (c *PrivateClient) GetNotices() ([]Notice, error) {
-	body, _, err := c.request(http.MethodGet, NoticesURL)
-	if err != nil {
-		return nil, err
-	}
-
-	var notices NoticesResponse
-	err = json.Unmarshal(body, &notices)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing Notices response: %s\n%s", string(body), err)
-	}
-
-	return notices.Results, nil
+func (c *PrivateClient) GetNotices() (notices []Notice, err error) {
+	notices, _, err = c.GetNoticesWithDigest()
+	return
 }
 
-// GetNoticesWithHash gets the user's notices with the response body's hash
-func (c *PrivateClient) GetNoticesWithHash() ([]Notice, string, error) {
-	body, _, err := c.request(http.MethodGet, NoticesURL)
+// GetNoticesWithDigest gets the user's notices with the response body's hash digest
+func (c *PrivateClient) GetNoticesWithDigest() (notices []Notice, digest string, err error) {
+	body, _, err := c.request(http.MethodGet, noticesURL)
 	if err != nil {
-		return nil, "", err
+		err = fmt.Errorf("error getting Notices: %w", err)
+		return
 	}
 
-	var notices NoticesResponse
-	err = json.Unmarshal(body, &notices)
-	if err != nil {
-		return nil, "", fmt.Errorf("error parsing Notices response: %s\n%s", string(body), err)
+	var resp NoticesResponse
+	if err = json.Unmarshal(body, &resp); err != nil {
+		err = fmt.Errorf("error parsing Notices: %w\n%s", err, string(body))
+		return
 	}
 
-	return notices.Results, fmt.Sprintf("%08x", crc32.ChecksumIEEE(body)), nil
+	notices = resp.Results
+	sort.Slice(notices, func(i, j int) bool {
+		return notices[i].PublishedAt.Unix() < notices[j].PublishedAt.Unix()
+	})
+	digest = fmt.Sprintf("%08x", crc32.ChecksumIEEE(body))
+	return
 }
 
 // GetNotice gets a specific notice with the given ID
-func (c *PrivateClient) GetNotice(ID int32) (Notice, error) {
+func (c *PrivateClient) GetNotice(ID int32) (notice Notice, err error) {
 	notices, err := c.GetNotices()
 	if err != nil {
-		return Notice{}, err
+		err = fmt.Errorf("error getting Notices: %w", err)
+		return
 	}
 
 	for _, n := range notices {
@@ -86,25 +83,24 @@ func (c *PrivateClient) GetNotice(ID int32) (Notice, error) {
 			return n, nil
 		}
 	}
-	return Notice{}, ErrNoticeNotFound
+	err = ErrNoticeNotFound
+	return
 }
 
 // GetSubjects gets the user's subjects
 func (c *PrivateClient) GetSubjects() ([]Subject, error) {
-	body, _, err := c.request(http.MethodGet, SubjectsURL)
+	body, _, err := c.request(http.MethodGet, subjectsURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting Subjects: %w", err)
 	}
 
-	var subjects SubjectsResponse
-	err = json.Unmarshal(body, &subjects)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing Subjects response: %s\n%s", string(body), err)
+	var resp SubjectsResponse
+	if err = json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing Subjects: %w\n%s", err, string(body))
 	}
-	return subjects.Results, nil
+
+	return resp.Results, nil
 }
-
-const revokeTokenRequestMimeType = "application/x-www-form-urlencoded"
 
 // RevokeToken revokes the user's OAuth token
 func (c *PrivateClient) RevokeToken() (err error) {
@@ -113,27 +109,28 @@ func (c *PrivateClient) RevokeToken() (err error) {
 		return
 	}
 
-	params := url.Values{
+	_, err = c.Client.PostForm(oAuthRevokeURL, url.Values{
 		"client_id": {oauthConf.ClientID},
 		"token":     {token.AccessToken},
-	}.Encode()
-	_, err = c.Client.Post(OAuthRevokeURL, revokeTokenRequestMimeType, strings.NewReader(params))
+	})
+	if err != nil {
+		err = fmt.Errorf("error revoking token: %w", err)
+	}
 	return
 }
 
-// GetAttachmentFileData gets the given attachment's file data
-// BE CAREFUL: some attachments posted on racó is copyright protected and should not be stored nor accessed by third-parties
-func (c *PrivateClient) GetAttachmentFileData(a Attachment) (data io.Reader, err error) {
+// GetAttachmentFile gets the given Attachment's bytes
+// BE CAREFUL: some attachments posted on racó are copyright-protected and should not be stored nor accessed by third-parties
+func (c *PrivateClient) GetAttachmentFile(a Attachment) ([]byte, error) {
 	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
 	if err != nil {
-		return
+		return nil, fmt.Errorf("error getting Attachment: %w", err)
 	}
 
-	data = bytes.NewReader(body)
-	return
+	return body, nil
 }
 
-// request makes a request to FIB API with the given method and URL
+// request makes a request to Private FIB API using the given HTTP method and URL
 func (c *PrivateClient) request(method, URL string) (body []byte, header http.Header, err error) {
 	req, err := http.NewRequest(method, URL, nil)
 	if err != nil {
@@ -148,20 +145,23 @@ func (c *PrivateClient) request(method, URL string) (body []byte, header http.He
 		return
 	}
 
-	header = resp.Header
 	defer resp.Body.Close()
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
+
 	if resp.StatusCode != http.StatusOK {
+		// API error handling
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
-			// token has been revoked on server
+			// token has expired or has been revoked on server
 			err = ErrAuthorizationExpired
 		} else {
 			// TODO: handle more other errors
 			err = ErrUnknown
 		}
 	}
+
+	header = resp.Header
 	return
 }

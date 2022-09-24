@@ -39,14 +39,15 @@ type Notice struct {
 // UnmarshalJSON adds .PublishedAt to the Notice when it's unmarshalled from JSON
 func (n *Notice) UnmarshalJSON(b []byte) error {
 	type Alias Notice
-	tmp := (*Alias)(n)
-	if err := json.Unmarshal(b, tmp); err != nil {
+	aux := (*Alias)(n)
+	if err := json.Unmarshal(b, aux); err != nil {
 		return err
 	}
 
-	n.PublishedAt = n.ModifiedAt
-	if n.ModifiedAt.Unix() < n.CreatedAt.Unix() {
+	if n.CreatedAt.Unix() > n.ModifiedAt.Unix() {
 		n.PublishedAt = n.CreatedAt
+	} else {
+		n.PublishedAt = n.ModifiedAt
 	}
 	return nil
 }
@@ -65,12 +66,12 @@ type Attachment struct {
 // it's useful since FIB API cookies on the user's browser will expire, accessing an attachment's original URL after that will get an `Unauthorized` response
 func (a *Attachment) UnmarshalJSON(b []byte) error {
 	type Alias Attachment
-	tmp := (*Alias)(a)
-	if err := json.Unmarshal(b, tmp); err != nil {
+	aux := (*Alias)(a)
+	if err := json.Unmarshal(b, aux); err != nil {
 		return err
 	}
 
-	a.RedirectURL = LoginRedirectBaseURL + url.QueryEscape(a.URL)
+	a.RedirectURL = loginRedirectBaseURL + url.QueryEscape(a.URL)
 	return nil
 }
 
@@ -119,16 +120,12 @@ type Time struct {
 
 const timeDateLayout = "2006-01-02T15:04:05"
 
-var (
-	tzMadrid *time.Location
-	nilTime  = (time.Time{}).Unix()
-)
+var tzMadrid *time.Location
 
 // init initializes the Madrid timezone used for parsing time&date in FIB API response JSONs
 func init() {
 	var err error
-	tzMadrid, err = time.LoadLocation("Europe/Madrid")
-	if err != nil {
+	if tzMadrid, err = time.LoadLocation("Europe/Madrid"); err != nil {
 		panic(err)
 	}
 }
@@ -143,9 +140,6 @@ func (t *Time) UnmarshalJSON(b []byte) (err error) {
 // MarshalJSON implements the json.Marshaler interface for Time type
 // it marshals the values of fields with Time type to UNIX timestamp format
 func (t Time) MarshalJSON() ([]byte, error) {
-	if t.Time.Unix() == nilTime {
-		return []byte("nil"), nil
-	}
 	return []byte(strconv.FormatInt(t.Time.Unix(), 10)), nil
 }
 
