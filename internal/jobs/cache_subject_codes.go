@@ -1,8 +1,9 @@
 package jobs
 
 import (
-	log "github.com/sirupsen/logrus"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"RacoBot/internal/db"
 	"RacoBot/pkg/fibapi"
@@ -15,7 +16,7 @@ func CacheSubjectCodes() {
 	start := time.Now()
 	subjects, err := fibapi.GetPublicSubjects()
 	if err != nil {
-		logger.Error(err)
+		logger.Errorf("failed to get subjects: %v", err)
 		return
 	}
 	logger.Infof("fetched %d subjects", len(subjects))
