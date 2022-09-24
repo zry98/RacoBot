@@ -4,9 +4,10 @@ import tb "gopkg.in/telebot.v3"
 
 var es = Locale{
 	StartMessage:                        "Por favor /login para autorizar Racó Bot.",
-	AuthorizedResponseBody:              "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"><title>Racó Bot</title></head><body><h1>Autorizado</h1><p>Puedes cerrar el navegador y volver a Telegram.</p></body></html>",
+	Authorized:                          "Autorizado",
+	AuthorizedResponseMessage:           "Ya puedes cerrar esta pestaña del navegador y volver a Telegram.",
 	GreetingMessage:                     "¡Hola, %s!",
-	HelpMessage:                         "Puede usar:\n/test para obtener una vista previa del último aviso\n/logout para dejar de recibir mensajes y revocar la autorización en el servidor.",
+	HelpMessage:                         "Puedes usar:\n/test para obtener una vista previa del último aviso.\n/logout para dejar de recibir mensajes y revocar la autorización en el servidor.",
 	AlreadyLoggedInMessage:              "Ya has iniciado la sesión, comprueba /whoami; o /logout para revocar la autorización.",
 	LogoutSucceededMessage:              "¡Has cerrado la sesión con éxito! Y el token de FIB API ha sido revocado en el servidor.",
 	LogoutFailedMessage:                 "<i>Se ha producido un error al cerrar la sesión. Por favor, intentalo de nuevo más tarde.</i>",

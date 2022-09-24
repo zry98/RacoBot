@@ -5,7 +5,8 @@ import tb "gopkg.in/telebot.v3"
 // Locale represents a locale (group of translations)
 type Locale struct {
 	StartMessage                        string
-	AuthorizedResponseBody              string
+	Authorized                          string
+	AuthorizedResponseMessage           string
 	GreetingMessage                     string
 	HelpMessage                         string
 	AlreadyLoggedInMessage              string

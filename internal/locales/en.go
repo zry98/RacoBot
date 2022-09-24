@@ -3,10 +3,11 @@ package locales
 import tb "gopkg.in/telebot.v3"
 
 var en = Locale{
-	StartMessage:                        "Please /login to authorize Racó Bot",
-	AuthorizedResponseBody:              `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Racó Bot</title></head><body><h1>Authorized</h1><p>You can close the browser and return to Telegram.</p></body></html>`,
+	StartMessage:                        "Please /login to authorize Racó Bot.",
+	Authorized:                          "Authorized",
+	AuthorizedResponseMessage:           "You can now close this browser tab and return to Telegram.",
 	GreetingMessage:                     "Hello, %s!",
-	HelpMessage:                         "You can use:\n/test to preview the latest one notice\n/logout to stop receiving messages and revoke the authorization on server.",
+	HelpMessage:                         "You can use:\n/test to preview the latest one notice.\n/logout to stop receiving messages and revoke the authorization on server.",
 	AlreadyLoggedInMessage:              "You are already logged-in, check /whoami; or /logout to revoke the authorization.",
 	LogoutSucceededMessage:              "You have successfully logged out! And the FIB API token has been revoked on server.",
 	LogoutFailedMessage:                 "<i>An error has occurred while logging you out. Please try again later.</i>",
