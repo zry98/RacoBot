@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,20 +14,20 @@ import (
 
 // LoginSession represents a session of login (FIB API OAuth authorization) procedure
 type LoginSession struct {
-	State              string `json:"-"`
 	UserID             int64  `json:"u"`
 	LoginLinkMessageID int64  `json:"m"`
+	State              string `json:"-"`
 	UserLanguageCode   string `json:"l"`
 }
 
 // User represents a user's data
 type User struct {
 	ID                  int64  `json:"-"`
+	TokenExpiry         int64  `json:"e"`
 	AccessToken         string `json:"a"`
 	RefreshToken        string `json:"r"`
-	TokenExpiry         int64  `json:"e"`
 	LanguageCode        string `json:"l,omitempty"`
-	LastNoticesHash     string `json:"h,omitempty"`
+	LastNoticesDigest   string `json:"d,omitempty"`
 	LastNoticeTimestamp int64  `json:"t,omitempty"`
 }
 
@@ -41,17 +40,17 @@ const (
 
 // key expirations
 const (
-	subjectUPCCodeKeyExpiration = time.Hour * 24 * 150 // expires in 150 days
+	subjectKeyExpiration = time.Hour * 24 * 150 // 150 days
 )
 
 // errors
 var (
-	ErrLoginSessionNotFound = errors.New("db: login session not found")
-	ErrUserNotFound         = errors.New("db: user not found")
-	ErrSubjectNotFound      = errors.New("db: subject not found")
+	ErrLoginSessionNotFound = fmt.Errorf("login session not found")
+	ErrUserNotFound         = fmt.Errorf("user not found")
+	ErrSubjectNotFound      = fmt.Errorf("subject not found")
 )
 
-// NewLoginSession creates a new login session for a user with the given ID
+// NewLoginSession creates a login session for a user with the given ID and language code
 func NewLoginSession(userID int64, languageCode string) (s LoginSession, err error) {
 	// make a random string as state
 	buf := make([]byte, 16)
@@ -78,8 +77,10 @@ func GetLoginSession(state string) (s LoginSession, err error) {
 		}
 		return
 	}
-
-	err = json.Unmarshal([]byte(value), &s)
+	if err = json.Unmarshal([]byte(value), &s); err != nil {
+		return
+	}
+	s.State = state
 	return
 }
 
@@ -90,7 +91,6 @@ func PutLoginSession(s LoginSession) error {
 	if err != nil {
 		return err
 	}
-
 	return rdb.Set(ctx, key, value, 10*time.Minute).Err() // expires in 10 minutes
 }
 
@@ -100,7 +100,7 @@ func DeleteLoginSession(state string) error {
 	return rdb.Del(ctx, key).Err()
 }
 
-// GetUser gets the user with the given ID
+// GetUser gets a user with the given ID
 func GetUser(userID int64) (user User, err error) {
 	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
 	value, err := rdb.Get(ctx, key).Result()
@@ -110,41 +110,43 @@ func GetUser(userID int64) (user User, err error) {
 		}
 		return
 	}
-
 	if err = json.Unmarshal([]byte(value), &user); err != nil {
 		return
 	}
-
 	user.ID = userID
 	return
 }
 
 // PutUser puts the given user
 func PutUser(user User) error {
+	key := fmt.Sprintf("%s:%d", userKeyPrefix, user.ID)
 	value, err := json.Marshal(user)
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf("%s:%d", userKeyPrefix, user.ID)
 	return rdb.Set(ctx, key, value, 0).Err()
 }
 
-// DeleteUser deletes the user with the given ID
+// DeleteUser deletes a user with the given ID
 func DeleteUser(userID int64) error {
 	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
 	return rdb.Del(ctx, key).Err()
 }
 
-// GetUserIDs gets all users' IDs from keys
-func GetUserIDs() (userIDs []int64, err error) {
+// GetAllUserIDs gets all user IDs
+func GetAllUserIDs() (userIDs []int64, err error) {
 	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", userKeyPrefix)).Result()
 	if err != nil {
+		if err == redis.Nil {
+			err = nil
+		}
 		return
 	}
 
+	userIDs = make([]int64, 0, len(keys))
 	var userID int64
 	for _, key := range keys {
-		userID, err = strconv.ParseInt(strings.Split(key, ":")[1], 10, 64)
+		userID, err = strconv.ParseInt(strings.TrimPrefix(key, userKeyPrefix+":"), 10, 64)
 		if err != nil {
 			return
 		}
@@ -153,9 +155,9 @@ func GetUserIDs() (userIDs []int64, err error) {
 	return
 }
 
-// GetSubjectUPCCode gets the UPC code of the subject with the given acronym
+// GetSubjectUPCCode gets the UPC code of a subject with the given acronym
 func GetSubjectUPCCode(acronym string) (code uint32, err error) {
-	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -168,20 +170,20 @@ func GetSubjectUPCCode(acronym string) (code uint32, err error) {
 	return
 }
 
-// PutSubjectUPCCode puts the given UPC code of the subject with the given acronym
+// PutSubjectUPCCode puts the given UPC code of a subject with the given acronym
 func PutSubjectUPCCode(acronym string, code uint32) error {
-	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
 	value := strconv.FormatInt(int64(code), 10)
-	return rdb.Set(ctx, key, value, subjectUPCCodeKeyExpiration).Err()
+	return rdb.Set(ctx, key, value, subjectKeyExpiration).Err()
 }
 
 // PutSubjectUPCCodes puts the given subject UPC codes in bulk
 func PutSubjectUPCCodes(codes map[string]uint32) error {
 	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		for acronym, code := range codes {
-			key := fmt.Sprintf("%s:%s", subjectKeyPrefix, strings.ToUpper(acronym))
+			key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
 			value := strconv.FormatInt(int64(code), 10)
-			pipe.Set(ctx, key, value, subjectUPCCodeKeyExpiration)
+			pipe.Set(ctx, key, value, subjectKeyExpiration)
 		}
 		return nil
 	})

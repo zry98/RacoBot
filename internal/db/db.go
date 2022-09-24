@@ -37,9 +37,9 @@ func Init(config Config) {
 		Password: config.Password,
 		DB:       config.DB,
 	})
-	_, err := rdb.Ping(ctx).Result()
-	if err != nil {
-		log.Fatal(err)
+	res, err := rdb.Ping(ctx).Result()
+	if err != nil || res != "PONG" {
+		log.Fatalf("failed to connect to DB: %v", err)
 	}
 
 	RateLimiter = redis_rate.NewLimiter(rdb)
@@ -48,6 +48,6 @@ func Init(config Config) {
 // Close closes the DB client
 func Close() {
 	if err := rdb.Close(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to close DB client: %v", err)
 	}
 }
