@@ -4,27 +4,28 @@ import tb "gopkg.in/telebot.v3"
 
 // Locale represents a locale (group of translations)
 type Locale struct {
-	StartMessage                           string
-	AuthorizedResponseBody                 string
-	GreetingMessage                        string
-	HelpMessage                            string
-	AlreadyLoggedInMessage                 string
-	LogoutSucceededMessage                 string
-	NoticeMessageOriginalLinkText          string
-	NoticeMessageAttachmentNounSingular    string
-	NoticeMessageAttachmentNounPlural      string
-	NoticeMessageAttachmentListHeader      string
-	NoticeMessageTooLongErrorMessage       string
-	NoticeUnavailableErrorMessage          string
-	NoAvailableNoticesErrorMessage         string
-	InternalErrorMessage                   string
-	FIBAPIAuthorizationExpiredErrorMessage string
-	LoginLinkMessage                       string
-	ChoosePreferredLanguageMenuText        string
-	LanguageUnavailableErrorMessage        string
-	PreferredLanguageSetMessage            string
-	DecimalSeparator                       rune
-	CommandsMenu                           []tb.Command
+	StartMessage                        string
+	AuthorizedResponseBody              string
+	GreetingMessage                     string
+	HelpMessage                         string
+	AlreadyLoggedInMessage              string
+	LogoutSucceededMessage              string
+	LogoutFailedMessage                 string
+	NoticeMessageOriginalLinkText       string
+	NoticeMessageAttachmentNounSingular string
+	NoticeMessageAttachmentNounPlural   string
+	NoticeMessageAttachmentListHeader   string
+	NoticeMessageTooLongErrorMessage    string
+	NoticeUnavailableErrorMessage       string
+	NoAvailableNoticesErrorMessage      string
+	InternalErrorMessage                string
+	FIBAPIAuthorizationExpiredMessage   string
+	LoginLinkMessage                    string
+	SelectPreferredLanguageMenuText     string
+	LanguageUnavailableErrorMessage     string
+	PreferredLanguageSetMessage         string
+	DecimalSeparator                    rune
+	CommandsMenu                        []tb.Command
 }
 
 var (
