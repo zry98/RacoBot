@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,15 +22,16 @@ func init() {
 	flag.Parse()
 	config = LoadConfig(*configPath)
 
+	fibapi.Init(config.FIBAPI)
 	db.Init(config.Redis)
 	bot.Init(config.TelegramBot)
-	fibapi.Init(config.FIBAPI)
 }
 
 func main() {
 	defer db.Close()
 
-	jobs.PullSubjectCodes()
+	// cache all subject UPC codes
+	jobs.CacheSubjectCodes()
 	jobs.Init(config.JobsConfig)
 
 	r := http.NewServeMux()
@@ -49,17 +49,12 @@ func main() {
 	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with HTTPS
 		cert, err := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed to load TLS certificate: %v", err)
 			return
 		}
 
-		u, err := url.Parse(config.FIBAPI.OAuthRedirectURI)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
 		srv.TLSConfig = &tls.Config{
-			ServerName:   u.Host,
+			ServerName:   config.TLS.ServerName,
 			Certificates: []tls.Certificate{cert},
 		}
 		log.Fatal(srv.ListenAndServeTLS("", ""))

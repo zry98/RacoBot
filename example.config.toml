@@ -2,8 +2,8 @@ host = "0.0.0.0"
 port = 443
 
 [log]
-level = "trace"
-# path = "/var/log/RacoBot.log"
+level = "info"
+#path = "/var/log/RacoBot.log"
 
 [tls]
 certificate_path = "fullchain.pem"
@@ -16,14 +16,16 @@ db = 0
 [fib_api]
 oauth_client_id = ""
 oauth_client_secret = ""
-oauth_redirect_URI = "https://raco-bot.example.com/o/authorize"
+oauth_redirect_uri = "https://raco-bot.example.com/o/authorize"
 public_client_id = ""
 
 [telegram_bot]
 token = ""
-webhook_URL = "https://raco-bot.example.com/bot"
-admin_UID = 12345
+webhook_url = "https://raco-bot.example.com/bot"
+#secret_token = ""
+admin_uid = 12345
 
 [jobs]
 # BE CAREFUL with the cron expressions
 push_new_notices_cron = "*/15 7-23 * * 1-5"  # runs every 15 minutes during 07:00-23:00 on every weekday
+cache_subject_codes_cron = "0 0 1 * *" # runs every 1st day of the month at 00:00

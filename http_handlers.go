@@ -171,7 +171,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	bot.SendMessage(loginSession.UserID, &bot.SilentMessage{Text: guideMessage})
 
 	// use Telegram URI to redirect user to the chat
-	http.Redirect(w, r, "tg://resolve?domain="+bot.BotUsername, 301)
+	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, 301)
 	// FIXME: message HTML after failed 301 redirect
 	fmt.Fprintln(w, locales.Get(loginSession.UserLanguageCode).AuthorizedResponseBody)
 }

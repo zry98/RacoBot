@@ -17,8 +17,13 @@ var (
 	b *tb.Bot
 
 	SecretToken string
-	BotUsername string
-	AdminUID    int64
+	Username    string
+	adminUID    int64
+
+	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
+	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
+	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
+	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
 )
 
 type Update tb.Update
@@ -31,9 +36,9 @@ func HandleUpdate(u Update) {
 // Config represents a configuration for Telegram bot
 type Config struct {
 	Token       string `toml:"token"`
-	WebhookURL  string `toml:"webhook_URL"`
+	WebhookURL  string `toml:"webhook_url"`
 	SecretToken string `toml:"secret_token"`
-	AdminUID    int64  `toml:"admin_UID"`
+	AdminUID    int64  `toml:"admin_uid"`
 }
 
 // Init initializes the bot
@@ -45,7 +50,7 @@ func Init(config Config) {
 		Verbose:     log.GetLevel() >= log.DebugLevel, // for debugging only
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to initialize bot: %v", err)
 	}
 
 	// command handlers
@@ -59,7 +64,7 @@ func Init(config Config) {
 	b.Handle("/debug", debug)
 	b.Handle("/announce", publishAnnouncement, adminOnly())
 
-	// initialize menu for setting preferred language
+	// initialize the menu for selecting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
 	b.Handle(&setLanguageButtonCA, setPreferredLanguage)
 	b.Handle(&setLanguageButtonES, setPreferredLanguage)
@@ -68,27 +73,23 @@ func Init(config Config) {
 	// set command menus
 	for _, languageCode := range locales.LanguageCodes {
 		if err = setCommands(locales.Get(languageCode).CommandsMenu, languageCode); err != nil {
-			log.Fatal(err)
-			return
+			log.Fatalf("failed to set commands menu for %s: %v", languageCode, err)
 		}
 	}
 
 	// update webhook URL
 	if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
-		log.Fatal(err)
-		return
+		log.Fatalf("failed to set webhook URL: %v", err)
 	}
 
-	// save secret token for HTTP request authentication
+	// save secret token for webhook request authentication
 	SecretToken = config.SecretToken
 
-	// save bot username for later use in callback URL
-	BotUsername = b.Me.Username
+	// save the bot username for later use in login flow callback URL
+	Username = b.Me.Username
 
-	// save admin UserID for later use in authorization middleware
-	AdminUID = config.AdminUID
-
-	log.Info("Bot OK") // all done, start serving
+	// save admin UID for later use in authorization middleware
+	adminUID = config.AdminUID
 }
 
 // setWebhook sets the Telegram bot webhook URL to the given one
@@ -119,7 +120,7 @@ func errorInterceptor() tb.MiddlewareFunc {
 					if err = db.DeleteUser(userID); err != nil {
 						log.Error(err)
 					}
-					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredErrorMessage)
+					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage)
 				}
 				log.Error(err)
 				return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage,
@@ -133,11 +134,12 @@ func errorInterceptor() tb.MiddlewareFunc {
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
-	sent, err := b.Send(&tb.Chat{ID: userID}, message, opt...)
+	msg, err := b.Send(&tb.Chat{ID: userID}, message, opt...)
 	if err != nil {
-		log.Errorf("error sending message to user %d: %s", userID, err)
+		log.Errorf("failed to send message to user %d: %s", userID, err)
+		return nil
 	}
-	return sent
+	return msg
 }
 
 // DeleteLoginLinkMessage deletes the login link message of the given login session
@@ -146,12 +148,12 @@ func DeleteLoginLinkMessage(s db.LoginSession) {
 		MessageID: strconv.FormatInt(s.LoginLinkMessageID, 10),
 		ChatID:    s.UserID,
 	}); err != nil {
-		log.Error(err)
+		log.Errorf("failed to delete login link message %d of session %s: %v", s.LoginLinkMessageID, s.State, err)
 	}
 }
 
-// FIXME: remove it when telebot implemented the language_code parameter
 // setCommands changes the list of the bot's commands
+// FIXME: remove it when telebot implemented the language_code parameter
 func setCommands(cmds []tb.Command, langCode string) error {
 	params := struct {
 		Commands     []tb.Command `json:"commands"`
@@ -168,7 +170,7 @@ func setCommands(cmds []tb.Command, langCode string) error {
 func adminOnly() tb.MiddlewareFunc {
 	return func(next tb.HandlerFunc) tb.HandlerFunc {
 		return func(c tb.Context) (err error) {
-			if c.Sender().ID != AdminUID {
+			if c.Sender().ID != adminUID {
 				return nil
 			}
 			return next(c)

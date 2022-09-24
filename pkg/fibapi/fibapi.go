@@ -16,7 +16,7 @@ import (
 type Config struct {
 	OAuthClientID     string `toml:"oauth_client_id"`
 	OAuthClientSecret string `toml:"oauth_client_secret"`
-	OAuthRedirectURI  string `toml:"oauth_redirect_URI"`
+	OAuthRedirectURI  string `toml:"oauth_redirect_uri"`
 	PublicClientID    string `toml:"public_client_id"`
 }
 
@@ -37,8 +37,8 @@ func Init(config Config) {
 		ClientID:     config.OAuthClientID,
 		ClientSecret: config.OAuthClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:   OAuthAuthURL,
-			TokenURL:  OAuthTokenURL,
+			AuthURL:   oAuthAuthURL,
+			TokenURL:  oAuthTokenURL,
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 		RedirectURL: config.OAuthRedirectURI,
@@ -50,7 +50,8 @@ func Init(config Config) {
 	publicClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				ServerName: ServerName,
+				ServerName: serverName,
+				MinVersion: tls.VersionTLS12,
 			},
 			ForceAttemptHTTP2: false,
 		},
