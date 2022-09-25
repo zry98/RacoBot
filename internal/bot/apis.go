@@ -21,6 +21,7 @@ type Client struct {
 // errors
 var (
 	ErrUserNotFound = fmt.Errorf("user not found")
+	ErrInternal     = fmt.Errorf("internal error")
 )
 
 // NewClient initializes a FIB API private client with the given Telegram UserID

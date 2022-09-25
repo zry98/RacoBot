@@ -57,8 +57,10 @@ func main() {
 			ServerName:   config.TLS.ServerName,
 			Certificates: []tls.Certificate{cert},
 		}
+		log.Infof("started listening on %s (HTTPS)", srv.Addr)
 		log.Fatal(srv.ListenAndServeTLS("", ""))
 	} else { // without HTTPS
+		log.Infof("started listening on %s", srv.Addr)
 		log.Fatal(srv.ListenAndServe())
 	}
 }

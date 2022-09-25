@@ -54,7 +54,7 @@ func Init(config Config) {
 	}
 
 	// command handlers
-	b.Use(errorInterceptor())
+	b.Use(errorInterceptor)
 	b.Handle("/start", start)
 	b.Handle("/login", login)
 	b.Handle("/lang", setPreferredLanguage)
@@ -62,7 +62,7 @@ func Init(config Config) {
 	b.Handle("/test", test)
 	b.Handle("/logout", logout)
 	b.Handle("/debug", debug)
-	b.Handle("/announce", publishAnnouncement, adminOnly())
+	b.Handle("/announce", publishAnnouncement, adminOnly)
 
 	// initialize the menu for selecting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
@@ -106,35 +106,32 @@ func setWebhook(URL string, secretToken string) error {
 }
 
 // errorInterceptor is a middleware that intercepts and handles the error returned by the next handler
-func errorInterceptor() tb.MiddlewareFunc {
-	return func(next tb.HandlerFunc) tb.HandlerFunc {
-		return func(c tb.Context) (err error) {
-			err = next(c)
-			if err != nil {
-				errData, ok := err.(*oauth2.RetrieveError)
-				if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
-					(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
-					userID := c.Sender().ID
-					log.WithField("UID", userID).Info(err)
+func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
+	return func(c tb.Context) error {
+		if err := next(c); err != nil {
+			errData, ok := err.(*oauth2.RetrieveError)
+			if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
+				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
+				userID := c.Sender().ID
+				log.WithField("UID", userID).Info(err)
 
-					if err = db.DeleteUser(userID); err != nil {
-						log.Error(err)
-					}
-					return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage)
+				if err = db.DeleteUser(userID); err != nil {
+					log.Errorf("failed to delete user %d: %v", userID, err)
 				}
-				log.Error(err)
-				return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage,
-					&tb.SendOptions{ParseMode: tb.ModeHTML})
+				return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage)
 			}
-			return nil
+			log.Error(err)
+			return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage,
+				&tb.SendOptions{ParseMode: tb.ModeHTML})
 		}
+		return nil
 	}
 }
 
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be used outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
-	msg, err := b.Send(&tb.Chat{ID: userID}, message, opt...)
+	msg, err := b.Send(tb.ChatID(userID), message, opt...)
 	if err != nil {
 		log.Errorf("failed to send message to user %d: %s", userID, err)
 		return nil
@@ -167,13 +164,11 @@ func setCommands(cmds []tb.Command, langCode string) error {
 }
 
 // adminOnly is a middleware that checks if the sender is admin
-func adminOnly() tb.MiddlewareFunc {
-	return func(next tb.HandlerFunc) tb.HandlerFunc {
-		return func(c tb.Context) (err error) {
-			if c.Sender().ID != adminUID {
-				return nil
-			}
-			return next(c)
+func adminOnly(next tb.HandlerFunc) tb.HandlerFunc {
+	return func(c tb.Context) (err error) {
+		if c.Sender().ID != adminUID {
+			return nil
 		}
+		return next(c)
 	}
 }
