@@ -29,7 +29,13 @@ var (
 // thus simplifies its usage to: `xxx, err := NewClient(userID).GetXXX()`
 func NewClient(userID int64) *Client {
 	user, err := db.GetUser(userID)
-	if err != nil || user.AccessToken == "" || user.RefreshToken == "" {
+	if err != nil {
+		if err != db.ErrUserNotFound {
+			log.Errorf("failed to get user %d: %v", userID, err)
+		}
+		return nil
+	}
+	if user.AccessToken == "" || user.RefreshToken == "" {
 		return nil
 	}
 
@@ -127,22 +133,24 @@ func (c *Client) GetNewNotices() (messages []NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	notices, noticesHash, err := c.PrivateClient.GetNoticesWithDigest()
+	notices, digest, err := c.PrivateClient.GetNoticesWithDigest()
 	if err != nil {
 		return
 	}
 
-	if noticesHash == c.User.LastNoticesDigest { // no change at all
+	if digest == c.User.LastNoticesDigest { // no change at all
 		return
 	}
 
-	if len(notices) == 0 { // no available notices (mostly due to the new semester not started)
-		c.User.LastNoticesDigest = noticesHash
-		if err = db.PutUser(c.User); err != nil {
-			err = fmt.Errorf("failed to put user: %w", err)
+	defer func() { // save states to DB
+		c.User.LastNoticesDigest = digest
+		if len(notices) > 0 {
+			c.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
 		}
-		return
-	}
+		if e := db.PutUser(c.User); e != nil {
+			log.Errorf("failed to put user %d: %v", c.User.ID, e)
+		}
+	}()
 
 	if c.User.LastNoticesDigest != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
 		messages = make([]NoticeMessage, 0, len(notices))
@@ -151,12 +159,6 @@ func (c *Client) GetNewNotices() (messages []NoticeMessage, err error) {
 				messages = append(messages, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
 			}
 		}
-	}
-
-	c.User.LastNoticesDigest = noticesHash
-	c.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
-	if err = db.PutUser(c.User); err != nil {
-		err = fmt.Errorf("failed to put user: %w", err)
 	}
 	return
 }
@@ -167,12 +169,13 @@ func (c *Client) Logout() error {
 		return ErrUserNotFound
 	}
 
+	defer func() { // delete user from DB no matter what
+		if e := db.DeleteUser(c.User.ID); e != nil {
+			log.Errorf("failed to delete user %d: %v", c.User.ID, e)
+		}
+	}()
 	if err := c.PrivateClient.RevokeToken(); err != nil {
 		return fmt.Errorf("failed to revoke token: %w", err)
-	}
-
-	if err := db.DeleteUser(c.User.ID); err != nil {
-		return fmt.Errorf("failed to delete user: %w", err)
 	}
 	return nil
 }

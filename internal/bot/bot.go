@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -36,9 +37,9 @@ func HandleUpdate(u Update) {
 // Config represents a configuration for Telegram bot
 type Config struct {
 	Token       string `toml:"token"`
-	WebhookURL  string `toml:"webhook_url"`
-	SecretToken string `toml:"secret_token"`
-	AdminUID    int64  `toml:"admin_uid"`
+	WebhookURL  string `toml:"webhook_url,omitempty"`
+	SecretToken string `toml:"secret_token,omitempty"`
+	AdminUID    int64  `toml:"admin_uid,omitempty"`
 }
 
 // Init initializes the bot
@@ -46,11 +47,11 @@ func Init(config Config) {
 	var err error
 	b, err = tb.NewBot(tb.Settings{
 		Token:       config.Token,
-		Synchronous: true,                             // for webhook mode
-		Verbose:     log.GetLevel() >= log.DebugLevel, // for debugging only
+		Synchronous: true,  // for webhook mode
+		Verbose:     false, // for debugging only
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize bot: %v", err)
+		fatalf("failed to initialize bot: %v", err)
 	}
 
 	// command handlers
@@ -73,13 +74,13 @@ func Init(config Config) {
 	// set command menus
 	for _, languageCode := range locales.LanguageCodes {
 		if err = setCommands(locales.Get(languageCode).CommandsMenu, languageCode); err != nil {
-			log.Fatalf("failed to set commands menu for %s: %v", languageCode, err)
+			fatalf("failed to set commands menu for %s: %v", languageCode, err)
 		}
 	}
 
 	// update webhook URL
 	if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
-		log.Fatalf("failed to set webhook URL: %v", err)
+		fatalf("failed to set webhook URL: %v", err)
 	}
 
 	// save secret token for webhook request authentication
@@ -90,6 +91,16 @@ func Init(config Config) {
 
 	// save admin UID for later use in authorization middleware
 	adminUID = config.AdminUID
+
+	log.Debug("bot initialized")
+}
+
+// Close closes the bot
+func Close() {
+	if b.Poller != nil {
+		b.Stop()
+	}
+	log.Debug("bot stopped")
 }
 
 // setWebhook sets the Telegram bot webhook URL to the given one
@@ -109,20 +120,23 @@ func setWebhook(URL string, secretToken string) error {
 func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) error {
 		if err := next(c); err != nil {
-			errData, ok := err.(*oauth2.RetrieveError)
-			if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired ||
-				(ok && errData.Response.StatusCode == http.StatusBadRequest && string(errData.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
-				userID := c.Sender().ID
-				log.WithField("UID", userID).Info(err)
-
-				if err = db.DeleteUser(userID); err != nil {
-					log.Errorf("failed to delete user %d: %v", userID, err)
+			if err == ErrUserNotFound {
+				return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage)
+			}
+			rErr, ok := err.(*oauth2.RetrieveError)
+			if err == fibapi.ErrAuthorizationExpired ||
+				(ok && rErr.Response.StatusCode == http.StatusBadRequest &&
+					string(rErr.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
+				log.Infof("user %d authorization has expired", c.Sender().ID)
+				if e := db.DeleteUser(c.Sender().ID); e != nil {
+					log.Errorf("failed to delete user %d: %v", c.Sender().ID, e)
 				}
 				return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage)
 			}
-			log.Error(err)
-			return c.Send(locales.Get(c.Sender().LanguageCode).InternalErrorMessage,
-				&tb.SendOptions{ParseMode: tb.ModeHTML})
+			if err != ErrInternal {
+				log.Errorf("error in handler: %v", err)
+			}
+			return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).InternalErrorMessage})
 		}
 		return nil
 	}
@@ -171,4 +185,9 @@ func adminOnly(next tb.HandlerFunc) tb.HandlerFunc {
 		}
 		return next(c)
 	}
+}
+
+// fatalf is a wrapper for panic a formatted error
+func fatalf(f string, a ...any) {
+	panic(fmt.Errorf(f, a...))
 }

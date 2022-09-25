@@ -14,14 +14,14 @@ import (
 	"RacoBot/pkg/fibapi"
 )
 
-// on command `/start`
 // start replies with a `/login` message
+// on command `/start`
 func start(c tb.Context) error {
 	return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage) // TODO: make it nicer
 }
 
-// on command `/login`
 // login replies with a FIB API OAuth authorization link message for the user
+// on command `/login`
 func login(c tb.Context) error {
 	userID := c.Sender().ID
 	if !rl.LoginCommandAllowed(userID) {
@@ -61,13 +61,13 @@ func login(c tb.Context) error {
 	return nil
 }
 
-// on command `/whoami`
 // whoami replies with the user's full name
+// on command `/whoami`
 func whoami(c tb.Context) error {
 	fullName, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
-		if err == ErrUserNotFound {
-			return ErrUserNotFound
+		if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired {
+			return err
 		}
 		log.Errorf("failed to get full name of user %d: %v", c.Sender().ID, err)
 		return ErrInternal
@@ -75,22 +75,25 @@ func whoami(c tb.Context) error {
 	return c.Send(fullName)
 }
 
-// on command `/logout`
 // logout revokes the user's FIB API OAuth token and deletes it from the database
+// on command `/logout`
 func logout(c tb.Context) error {
 	client := NewClient(c.Sender().ID)
 	if client == nil {
 		return ErrUserNotFound
 	}
 	if err := client.Logout(); err != nil {
+		if err == fibapi.ErrAuthorizationExpired {
+			return err
+		}
 		log.Errorf("failed to logout user %d: %v", c.Sender().ID, err)
 		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).LogoutFailedMessage})
 	}
 	return c.Send(locales.Get(client.User.LanguageCode).LogoutSucceededMessage)
 }
 
-// on command `/debug <noticeID>`
 // debug replies with a notice with the given ID in payload
+// on command `/debug <noticeID>`
 func debug(c tb.Context) error {
 	payload := c.Message().Payload
 	if payload == "" {
@@ -118,8 +121,8 @@ func debug(c tb.Context) error {
 	return c.Send(&notice)
 }
 
-// on command `/test`
 // test replies with the user's latest one notice
+// on command `/test`
 func test(c tb.Context) error {
 	client := NewClient(c.Sender().ID)
 	if client == nil {
@@ -127,16 +130,20 @@ func test(c tb.Context) error {
 	}
 	notices, digest, err := client.GetNoticesWithDigest()
 	if err != nil {
+		if err == fibapi.ErrAuthorizationExpired {
+			return err
+		}
 		log.Errorf("failed to get notices of user %d: %v", c.Sender().ID, err)
 		return ErrInternal
 	}
+
 	defer func() { // save states to DB by the way
 		client.User.LastNoticesDigest = digest
 		if len(notices) > 0 {
 			client.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
 		}
-		if err = db.PutUser(client.User); err != nil {
-			log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
+		if e := db.PutUser(client.User); e != nil {
+			log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
 		}
 	}()
 
@@ -147,16 +154,15 @@ func test(c tb.Context) error {
 	return c.Send(&NoticeMessage{latestNotice, client.User, getNoticeLinkURL(latestNotice)})
 }
 
-// on command `/lang` and on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
-// setPreferredLanguage replies with the menu of supported languages for the user to select from on command,
-// or sets the user's preferred language when on callbacks
+// setPreferredLanguage replies with the menu of supported languages for the user to select from on command `/lang`,
+// or sets the user's preferred language when on callbacks &setLanguageButtonEN, &setLanguageButtonES, &setLanguageButtonCA
 func setPreferredLanguage(c tb.Context) error {
-	user, e := db.GetUser(c.Sender().ID)
-	if e != nil {
-		if e == db.ErrUserNotFound {
+	user, err := db.GetUser(c.Sender().ID)
+	if err != nil {
+		if err == db.ErrUserNotFound {
 			return ErrUserNotFound
 		}
-		log.Fatalf("failed to get user %d: %v", c.Sender().ID, e)
+		log.Errorf("failed to get user %d: %v", c.Sender().ID, err)
 		return ErrInternal
 	}
 
@@ -171,15 +177,15 @@ func setPreferredLanguage(c tb.Context) error {
 		return c.Reply(&ErrorMessage{locales.Get(c.Sender().LanguageCode).LanguageUnavailableErrorMessage})
 	}
 	user.LanguageCode = langCode
-	if err := db.PutUser(user); err != nil {
-		log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
+	if e := db.PutUser(user); e != nil {
+		log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
 		return ErrInternal
 	}
 	return c.Edit(locales.Get(langCode).PreferredLanguageSetMessage)
 }
 
-// on command `/announce`
 // publishAnnouncement publishes and pins the given announcement to all users in database
+// on command `/announce`
 func publishAnnouncement(c tb.Context) error {
 	m := AnnouncementMessage{
 		Text: strings.ReplaceAll(c.Message().Payload, "<br>", "\n"),
