@@ -26,6 +26,8 @@ const (
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
 func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
+	defer fmt.Fprintln(w)
+
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		fmt.Fprintln(w)
@@ -78,6 +80,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// use goroutine to handle the update in the background and return a response to the webhook request ASAP
 	go bot.HandleUpdate(update)
+
 	fmt.Fprintln(w)
 	return
 }
@@ -92,19 +95,31 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-	if code == "" || state == "" {
+	if code == "" || state == "" || r.Header.Get("referer") != fibapi.BaseURL {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
 		return
 	}
 
 	if !rl.OAuthRedirectRequestAllowed(r.Context(), r.RemoteAddr) {
+		log.WithFields(log.Fields{
+			"IP": r.RemoteAddr,
+		}).Info("rate limited")
 		w.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintln(w, RateLimitedResponseBody)
 		return
 	}
 
 	loginSession, err := db.GetLoginSession(state)
+	if err != nil && err != db.ErrLoginSessionNotFound {
+		log.WithFields(log.Fields{
+			"IP":    r.RemoteAddr,
+			"state": state,
+		}).Errorf("failed to get login session: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(w, InternalErrorResponseBody)
+		return
+	}
 	if err == db.ErrLoginSessionNotFound || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
 		log.WithFields(log.Fields{
 			"IP":    r.RemoteAddr,
@@ -112,15 +127,6 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		}).Info("invalid OAuth redirect request: login session not found or invalid")
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
-		return
-	}
-	if err != nil {
-		log.WithFields(log.Fields{
-			"IP":    r.RemoteAddr,
-			"state": state,
-		}).Errorf("failed to get login session: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintln(w, InternalErrorResponseBody)
 		return
 	}
 
@@ -172,23 +178,23 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		locales.Get(loginSession.UserLanguageCode).HelpMessage)
 	bot.SendMessage(loginSession.UserID, greetingMessage)
 
-	// use Telegram URI to redirect user back to the chat
-	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, 301)
-	// if HTTP 301 redirect didn't work, try HTML meta redirect and show message
+	// respond HTML with authorized message
+	// meanwhile make 301 redirect to let user back to the chat using Telegram URI scheme
 	fmt.Fprintf(w, AuthorizedResponseBodyTemplate,
 		loginSession.UserLanguageCode,
 		bot.Username,
 		locales.Get(loginSession.UserLanguageCode).Authorized,
 		locales.Get(loginSession.UserLanguageCode).AuthorizedResponseMessage)
+	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, 301)
 	return
 }
 
 // middleware provides some useful middlewares for the server
-func middleware(h http.Handler) http.Handler {
+func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// returns an HTTP 500 response if a handler got panicked
-		defer func() {
+		defer func() { // returns an HTTP 500 response if the next handler got panicked
 			if err := recover(); err != nil {
+				log.Errorf("error recovered in request \"%s %s\": %v", r.Method, r.URL.Path, err)
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintln(w, InternalErrorResponseBody)
 				return
@@ -200,6 +206,6 @@ func middleware(h http.Handler) http.Handler {
 			r.RemoteAddr = ip
 		}
 
-		h.ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }

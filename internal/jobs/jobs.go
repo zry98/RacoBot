@@ -28,6 +28,14 @@ func Init(config Config) {
 	scheduler.StartAsync()
 }
 
+// Close stops the jobs scheduler
+func Close() {
+	if scheduler != nil {
+		scheduler.Stop()
+	}
+	log.Info("jobs scheduler stopped")
+}
+
 // addJobs adds the jobs to the scheduler
 func addJobs(config Config) {
 	if config.PushNewNoticesCronExp != "" {

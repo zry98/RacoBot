@@ -19,25 +19,31 @@ const (
 
 // limit key prefixes
 const (
-	botUpdateKeyPrefix            = "r:bu"
-	oauthRedirectRequestKeyPrefix = "r:or"
-	loginCommandKeyPrefix         = "r:l"
+	botUpdateKeyPrefix            = "b"
+	oauthRedirectRequestKeyPrefix = "o"
+	loginCommandKeyPrefix         = "l"
 )
 
-// OAuthRedirectRequestAllowed checks if an incoming OAuth redirect request from the given IP address is allowed to get processed
-func OAuthRedirectRequestAllowed(ctx context.Context, IP string) bool {
-	key := fmt.Sprintf("%s:%s", oauthRedirectRequestKeyPrefix, IP)
-	res, err := db.RateLimiter.Allow(ctx, key, redis_rate.PerMinute(oauthRedirectRequestLimitPerMinute))
+var (
+	botUpdateLimit            = redis_rate.PerSecond(botUpdateLimitPerSecond)
+	oauthRedirectRequestLimit = redis_rate.PerMinute(oauthRedirectRequestLimitPerMinute)
+	loginCommandLimit         = redis_rate.PerMinute(loginCommandLimitPerMinute)
+)
+
+// BotUpdateAllowed checks if an incoming Bot Update from a user with the given ID is allowed to get processed
+func BotUpdateAllowed(ctx context.Context, userID int64) bool {
+	key := fmt.Sprintf("%s:%d", botUpdateKeyPrefix, userID)
+	res, err := db.RateLimiter.Allow(ctx, key, botUpdateLimit)
 	if err != nil {
 		return false
 	}
 	return res.Allowed != 0
 }
 
-// BotUpdateAllowed checks if an incoming Bot Update from a user with the given ID is allowed to get processed
-func BotUpdateAllowed(ctx context.Context, userID int64) bool {
-	key := fmt.Sprintf("%s:%d", botUpdateKeyPrefix, userID)
-	res, err := db.RateLimiter.Allow(ctx, key, redis_rate.PerSecond(botUpdateLimitPerSecond))
+// OAuthRedirectRequestAllowed checks if an incoming OAuth redirect request from the given IP address is allowed to get processed
+func OAuthRedirectRequestAllowed(ctx context.Context, IP string) bool {
+	key := fmt.Sprintf("%s:%s", oauthRedirectRequestKeyPrefix, IP)
+	res, err := db.RateLimiter.Allow(ctx, key, oauthRedirectRequestLimit)
 	if err != nil {
 		return false
 	}
@@ -47,7 +53,7 @@ func BotUpdateAllowed(ctx context.Context, userID int64) bool {
 // LoginCommandAllowed checks if an incoming /login command from a user with the given ID is allowed to get processed
 func LoginCommandAllowed(userID int64) bool {
 	key := fmt.Sprintf("%s:%d", loginCommandKeyPrefix, userID)
-	res, err := db.RateLimiter.Allow(context.Background(), key, redis_rate.PerMinute(loginCommandLimitPerMinute))
+	res, err := db.RateLimiter.Allow(context.Background(), key, loginCommandLimit)
 	if err != nil {
 		return false
 	}

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/go-redis/redis/v8"
@@ -39,15 +40,18 @@ func Init(config Config) {
 	})
 	res, err := rdb.Ping(ctx).Result()
 	if err != nil || res != "PONG" {
-		log.Fatalf("failed to connect to DB: %v", err)
+		panic(fmt.Errorf("failed to connect to DB: %v", err))
 	}
 
 	RateLimiter = redis_rate.NewLimiter(rdb)
+
+	log.Debug("DB client initialized")
 }
 
 // Close closes the DB client
 func Close() {
 	if err := rdb.Close(); err != nil {
-		log.Fatalf("failed to close DB client: %v", err)
+		log.Errorf("failed to close DB client: %v", err)
 	}
+	log.Debug("DB client closed")
 }
