@@ -10,7 +10,7 @@ var en = Locale{
 	HelpMessage:                         "You can use:\n/test to preview the latest one notice.\n/logout to stop receiving messages and revoke the authorization on server.",
 	AlreadyLoggedInMessage:              "You are already logged-in, check /whoami; or /logout to revoke the authorization.",
 	LogoutSucceededMessage:              "You have successfully logged out! And the FIB API token has been revoked on server.",
-	LogoutFailedMessage:                 "<i>An error has occurred while logging you out. Please try again later.</i>",
+	LogoutFailedMessage:                 `An error has occurred while logging you out. Although the bot has already deleted you from the database, you can revoke the token manually on <a href="https://api.fib.upc.edu/v2/o/authorized_tokens/">the FIB API</a> if you want.`,
 	NoticeMessageOriginalLinkText:       "Link",
 	NoticeMessageAttachmentNounSingular: "attachment",
 	NoticeMessageAttachmentNounPlural:   "attachments",
