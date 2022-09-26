@@ -56,7 +56,7 @@ func main() {
 	bot.Init(config.TelegramBot)
 	defer cleanup()
 
-	//jobs.CacheSubjectCodes()
+	jobs.CacheSubjectCodes()
 	jobs.Init(config.JobsConfig)
 
 	r := http.NewServeMux()

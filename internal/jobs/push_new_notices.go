@@ -15,7 +15,6 @@ import (
 // TODO: use goroutine to send messages concurrently?
 func PushNewNotices() {
 	logger := log.WithField("job", "PushNewNotices")
-	var checkedUserCount, sentMessageCount uint32
 
 	userIDs, err := db.GetAllUserIDs()
 	if err != nil {
@@ -25,6 +24,7 @@ func PushNewNotices() {
 
 	waitUntilSecond5() // FIXME: hacky
 
+	var checkedUserCount, totalFetchedCount, totalSentCount uint32
 	start := time.Now()
 	for _, userID := range userIDs {
 		userLogger := logger.WithField("UID", userID)
@@ -32,41 +32,53 @@ func PushNewNotices() {
 		if client == nil {
 			// possible database corruption
 			userLogger.Error("failed to create client")
-			// ask the user to re-login to fix it
-			bot.SendMessage(userID, &bot.ErrorMessage{locales.Get("default").FIBAPIAuthorizationExpiredMessage})
+			// try sending a message to the user to ask them to re-login to fix it
+			_ = bot.SendMessage(userID, &bot.ErrorMessage{
+				Text: locales.Get("default").FIBAPIAuthorizationExpiredMessage,
+			})
 			if err = db.DeleteUser(userID); err != nil {
 				logger.Errorf("failed to delete user %d: %v", userID, err)
 			}
 			continue
 		}
 
-		newNotices, e := client.GetNewNotices()
-		if e != nil {
-			if e == fibapi.ErrAuthorizationExpired {
-				// notify the user that their FIB API authorization has expired and delete them from DB
-				userLogger.Info("token has expired")
-				bot.SendMessage(userID, &bot.ErrorMessage{locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage})
-				if err = db.DeleteUser(userID); err != nil {
-					logger.Errorf("failed to delete user %d: %v", userID, err)
+		var newNotices []bot.NoticeMessage
+		newNotices, err = client.GetNewNotices()
+		if err != nil {
+			userLogger.Errorf("failed to get new notices: %v", err)
+			if err == fibapi.ErrAuthorizationExpired {
+				// notify the user that their FIB API authorization has expired
+				if bot.SendMessage(userID, &bot.ErrorMessage{
+					Text: locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage,
+				}) != nil {
+					// delete them from DB if the notification was sent successfully
+					if err = db.DeleteUser(userID); err != nil {
+						logger.Errorf("failed to delete user %d: %v", userID, err)
+					}
 				}
-			} else {
-				userLogger.Errorf("failed to get new notices: %v", e)
 			}
 			continue
 		}
-		userLogger.Infof("fetched %d new notices", len(newNotices))
-
-		for _, n := range newNotices {
-			bot.SendMessage(userID, &n)
-			userLogger.Infof("sent new notice %d", n.ID)
-			sentMessageCount++
-		}
-
 		checkedUserCount++
+
+		if len(newNotices) == 0 { // nothing new
+			continue
+		}
+		totalFetchedCount += uint32(len(newNotices))
+		var userSentCount uint32
+		for _, n := range newNotices {
+			if bot.SendMessage(userID, &n) != nil {
+				userSentCount++
+				totalSentCount++
+			}
+		}
+		userLogger.Infof("sent %d/%d new notices", userSentCount, len(newNotices))
 	}
 
-	logger.Infof("checked %d/%d users and sent %d messages in %s",
-		checkedUserCount, len(userIDs), sentMessageCount, time.Since(start))
+	logger.Infof("checked %d/%d users and sent %d/%d new notices in %s",
+		checkedUserCount, len(userIDs),
+		totalSentCount, totalFetchedCount,
+		time.Since(start))
 }
 
 // waitUntilSecond5 waits until the current time is at least 5 seconds into the minute

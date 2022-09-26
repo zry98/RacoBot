@@ -38,7 +38,7 @@ const (
 // errors
 var (
 	ErrInvalidAuthorizationCode = fmt.Errorf("fibapi: invalid authorization code")
-	ErrAuthorizationExpired     = fmt.Errorf("fibapi: authorization expired")
+	ErrAuthorizationExpired     = fmt.Errorf("fibapi: authorization has expired")
 	ErrNoticeNotFound           = fmt.Errorf("fibapi: notice not found")
 	ErrResourceNotFound         = fmt.Errorf("fibapi: resource not found")
 )

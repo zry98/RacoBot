@@ -85,7 +85,7 @@ func Init(config Config) {
 			fatalf("failed to delete webhook: %v", err)
 		}
 		useLongPoller = true
-		go b.Start()
+		b.Start()
 	} else { // get updates from webhook HTTP handler instead of long poller if a URL is provided
 		_, err = url.Parse(config.WebhookURL)
 		if err != nil {

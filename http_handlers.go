@@ -26,8 +26,6 @@ const (
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
 func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
-	defer fmt.Fprintln(w)
-
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
