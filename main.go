@@ -31,12 +31,13 @@ func init() {
 		}
 	}()
 
-	sc := make(chan os.Signal)
+	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sc
 		log.Info("received SIGTERM, exiting")
 		cleanup()
+		close(sc)
 		os.Exit(0)
 	}()
 
@@ -51,8 +52,8 @@ func cleanup() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Errorf("failed to shutdown HTTP server: %v", err)
 	}
-	jobs.Close()
-	//bot.Close()
+	jobs.Stop()
+	bot.Stop()
 	db.Close()
 }
 
@@ -68,14 +69,14 @@ func main() {
 	bot.Init(config.TelegramBot)
 	defer cleanup()
 
-	if log.GetLevel() < log.DebugLevel {
-		jobs.CacheSubjectCodes()
-	}
+	//jobs.CacheSubjectCodes()
 	jobs.Init(config.JobsConfig)
 
 	r := http.NewServeMux()
-	r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)      // Telegram Bot update
 	r.HandleFunc(config.FIBAPIOAuthRedirectPath, HandleOAuthRedirect) // FIB API OAuth redirect
+	if config.TelegramBotWebhookPath != "" {
+		r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate) // Telegram Bot update
+	}
 
 	srv = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.Host, config.Port),
@@ -89,7 +90,7 @@ func main() {
 	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with HTTPS
 		cert, e := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
 		if e != nil {
-			log.Errorf("failed to load TLS certificate:", e)
+			log.Errorf("failed to load TLS certificate: %v", e)
 			return
 		}
 

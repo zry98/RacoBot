@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	log "github.com/sirupsen/logrus"
@@ -71,22 +72,27 @@ func LoadConfig(path string) (c Config) {
 }
 
 // setupRoutingPaths sets up the routing patterns configuration for HTTP server
-func (c *Config) setupRoutingPaths() (err error) {
-	u, err := url.Parse(c.TelegramBot.WebhookURL)
-	if err != nil {
-		return
+func (c *Config) setupRoutingPaths() error {
+	if c.TelegramBot.WebhookURL != "" {
+		u, err := url.Parse(c.TelegramBot.WebhookURL)
+		if err != nil {
+			return err
+		}
+		c.TelegramBotWebhookPath = u.Path
 	}
-	c.TelegramBotWebhookPath = u.Path
 
-	u, err = url.Parse(c.FIBAPI.OAuthRedirectURI)
+	if c.FIBAPI.OAuthRedirectURI == "" {
+		log.Fatalf("missing FIB API OAuth redirect URI in config")
+	}
+	u, err := url.Parse(c.FIBAPI.OAuthRedirectURI)
 	if err != nil {
-		return
+		return err
 	}
 	c.FIBAPIOAuthRedirectPath = u.Path
 	if c.TLS.ServerName == "" {
 		c.TLS.ServerName = u.Hostname()
 	}
-	return
+	return nil
 }
 
 // setupLogger sets up the global logger configuration
@@ -101,7 +107,7 @@ func (c *Config) setupLogger() {
 		log.Fatalf("failed to parse log level: %v", err)
 	}
 	log.SetLevel(level)
-	log.Infof("log level set to %s", level)
+	log.Infof("log level set to %s", strings.ToUpper(level.String()))
 	if level >= log.DebugLevel {
 		log.SetReportCaller(true)
 	}

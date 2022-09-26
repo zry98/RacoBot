@@ -55,7 +55,15 @@ func NewClient(userID int64) *Client {
 func (c *Client) updateToken() {
 	newToken, err := c.PrivateClient.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
-		log.Errorf("failed to extract token from user %d: %v", c.User.ID, err)
+		err = fibapi.ProcessTokenError(err)
+		if err == fibapi.ErrInvalidAuthorizationCode {
+			log.Errorf("user %d authorization has expired", c.User.ID)
+			if e := db.DeleteUser(c.User.ID); e != nil {
+				log.Errorf("failed to delete user %d: %v", c.User.ID, e)
+			}
+		} else {
+			log.Errorf("failed to extract token from user %d: %v", c.User.ID, err)
+		}
 		return
 	}
 
@@ -69,6 +77,7 @@ func (c *Client) updateToken() {
 		log.Errorf("failed to put user %d: %v", c.User.ID, err)
 		return
 	}
+	log.Debugf("user %d token has been updated, new expiry: %s", c.User.ID, newToken.Expiry.Format(time.RFC3339))
 }
 
 // GetFullName gets the user's full name (as format of `${firstName} ${lastName}`)

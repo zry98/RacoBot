@@ -2,11 +2,10 @@ package bot
 
 import (
 	"fmt"
-	"net/http"
+	"net/url"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
@@ -17,9 +16,10 @@ import (
 var (
 	b *tb.Bot
 
-	SecretToken string
-	Username    string
-	adminUID    int64
+	useLongPoller bool
+	SecretToken   string
+	Username      string
+	adminUID      int64
 
 	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
 	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
@@ -47,8 +47,8 @@ func Init(config Config) {
 	var err error
 	b, err = tb.NewBot(tb.Settings{
 		Token:       config.Token,
-		Synchronous: true,  // for webhook mode
-		Verbose:     false, // for debugging only
+		Synchronous: true,
+		Verbose:     log.GetLevel() > log.DebugLevel,
 	})
 	if err != nil {
 		fatalf("failed to initialize bot: %v", err)
@@ -78,16 +78,40 @@ func Init(config Config) {
 		}
 	}
 
-	// update webhook URL
-	if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
-		fatalf("failed to set webhook URL: %v", err)
-	}
+	if config.WebhookURL == "" {
+		if err = b.RemoveWebhook(true); err != nil {
+			fatalf("failed to delete webhook: %v", err)
+		}
+		useLongPoller = true
+		go b.Start()
+	} else { // get updates from webhook HTTP handler instead of long poller if a URL is provided
+		_, err = url.Parse(config.WebhookURL)
+		if err != nil {
+			fatalf("failed to parse webhook URL: %v", err)
+		}
+		if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
+			fatalf("failed to set webhook: %v", err)
+		}
+		// waiting for telebot to implement webhook secret token (https://github.com/tucnak/telebot/pull/543)
+		//if err = b.SetWebhook(&tb.Webhook{
+		//	Listen:        config.WebhookURL,
+		//	DropUpdates:   false,
+		//	HasCustomCert: false,
+		//	SecretToken:   config.SecretToken,
+		//}); err != nil {
+		//	fatalf("failed to set webhook: %v", err)
+		//}
 
-	// save secret token for webhook request authentication
-	SecretToken = config.SecretToken
+		// save secret token for webhook request authentication in HTTP handler
+		SecretToken = config.SecretToken
+		useLongPoller = false
+	}
 
 	// save the bot username for later use in login flow callback URL
 	Username = b.Me.Username
+	if Username == "" {
+		fatalf("failed to get bot username")
+	}
 
 	// save admin UID for later use in authorization middleware
 	adminUID = config.AdminUID
@@ -95,10 +119,14 @@ func Init(config Config) {
 	log.Debug("bot initialized")
 }
 
-// Close closes the bot
-func Close() {
-	if b.Poller != nil {
+// Stop stops the bot
+func Stop() {
+	if useLongPoller {
 		b.Stop()
+	} else {
+		if err := b.RemoveWebhook(false); err != nil {
+			log.Errorf("failed to delete webhook: %v", err)
+		}
 	}
 	log.Debug("bot stopped")
 }
@@ -123,15 +151,12 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 			if err == ErrUserNotFound {
 				return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage)
 			}
-			rErr, ok := err.(*oauth2.RetrieveError)
-			if err == fibapi.ErrAuthorizationExpired ||
-				(ok && rErr.Response.StatusCode == http.StatusBadRequest &&
-					string(rErr.Body) == fibapi.OAuthInvalidAuthorizationCodeResponse) {
+			if err == fibapi.ErrAuthorizationExpired {
 				log.Infof("user %d authorization has expired", c.Sender().ID)
 				if e := db.DeleteUser(c.Sender().ID); e != nil {
 					log.Errorf("failed to delete user %d: %v", c.Sender().ID, e)
 				}
-				return c.Send(locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage)
+				return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})
 			}
 			if err != ErrInternal {
 				log.Errorf("error in handler: %v", err)
@@ -143,7 +168,7 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 }
 
 // SendMessage sends the given message to a Telegram user with the given ID
-// it's meant to be used outside the package
+// it's meant to be called from outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
 	msg, err := b.Send(tb.ChatID(userID), message, opt...)
 	if err != nil {
@@ -159,7 +184,7 @@ func DeleteLoginLinkMessage(s db.LoginSession) {
 		MessageID: strconv.FormatInt(s.LoginLinkMessageID, 10),
 		ChatID:    s.UserID,
 	}); err != nil {
-		log.Errorf("failed to delete login link message %d of session %s: %v", s.LoginLinkMessageID, s.State, err)
+		log.Errorf("failed to delete login link message %d of session \"%s\": %v", s.LoginLinkMessageID, s.State, err)
 	}
 }
 
