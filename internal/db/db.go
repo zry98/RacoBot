@@ -52,7 +52,7 @@ func Init(config Config) {
 func Close() {
 	if err := rdb.Close(); err != nil {
 		log.Errorf("failed to close DB client: %v", err)
-		return
+	} else {
+		log.Debug("DB client closed")
 	}
-	log.Debug("DB client closed")
 }

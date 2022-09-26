@@ -25,22 +25,6 @@ var (
 )
 
 func init() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Fatalf("error recovered: %v", err)
-		}
-	}()
-
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sc
-		log.Info("received SIGTERM, exiting")
-		cleanup()
-		close(sc)
-		os.Exit(0)
-	}()
-
 	configPath := flag.String("config", "./config.toml", "Config file path (default: ./config.toml)")
 	flag.Parse()
 	config = LoadConfig(*configPath)
@@ -49,8 +33,11 @@ func init() {
 func cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Errorf("failed to shutdown HTTP server: %v", err)
+	if srv != nil {
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Errorf("failed to shutdown HTTP server: %v", err)
+		}
+		log.Debug("HTTP server shutdown")
 	}
 	jobs.Stop()
 	bot.Stop()
@@ -60,7 +47,7 @@ func cleanup() {
 func main() {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Fatalf("error recovered: %v", err)
+			log.Fatal(err)
 		}
 	}()
 
@@ -86,8 +73,18 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	var err error
-	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with HTTPS
+	srvShutdown := make(chan struct{})
+	go func() { // graceful shutdown
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+		<-s
+		cleanup()
+		close(srvShutdown)
+		close(s)
+		os.Exit(0)
+	}()
+
+	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with TLS
 		cert, e := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
 		if e != nil {
 			log.Errorf("failed to load TLS certificate: %v", e)
@@ -98,14 +95,20 @@ func main() {
 			ServerName:   config.TLS.ServerName,
 			Certificates: []tls.Certificate{cert},
 		}
-		log.Infof("started listening on %s (HTTPS)", srv.Addr)
-		err = srv.ListenAndServeTLS("", "")
-	} else { // without HTTPS
-		log.Infof("started listening on %s", srv.Addr)
-		err = srv.ListenAndServe()
+		go func() {
+			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+				log.Errorf("failed to start HTTP server: %v", err)
+				srvShutdown <- struct{}{}
+			}
+		}()
+	} else { // without TLS
+		go func() {
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Errorf("failed to start HTTP server: %v", err)
+				srvShutdown <- struct{}{}
+			}
+		}()
 	}
-	if err != nil {
-		log.Errorf("error returned by HTTP server: %v", err)
-		return
-	}
+	log.Debugf("HTTP server started listening on %s", srv.Addr)
+	<-srvShutdown
 }
