@@ -18,6 +18,7 @@ import (
 // the token may expire, but the underlying client will try to refresh it in later API requests
 type PrivateClient struct {
 	*http.Client
+	ctx context.Context
 }
 
 // NewClient initializes a FIB API private client with the given OAuth token
@@ -25,19 +26,17 @@ func NewClient(token oauth2.Token) *PrivateClient {
 	ctx := context.Background()
 	ts := oauthConf.TokenSource(ctx, &token)
 	client := oauth2.NewClient(ctx, ts)
-	return &PrivateClient{client}
+	return &PrivateClient{client, ctx}
 }
 
 // GetUserInfo gets the user's basic information (username, first name and last name only)
 func (c *PrivateClient) GetUserInfo() (userInfo UserInfo, err error) {
 	body, _, err := c.request(http.MethodGet, userInfoURL)
 	if err != nil {
-		err = fmt.Errorf("error getting UserInfo: %w", err)
 		return
 	}
-
 	if err = json.Unmarshal(body, &userInfo); err != nil {
-		err = fmt.Errorf("error parsing UserInfo: %w\n%s", err, string(body))
+		err = fmt.Errorf("fibapi: error parsing UserInfo: %w", err)
 	}
 	return
 }
@@ -52,13 +51,11 @@ func (c *PrivateClient) GetNotices() (notices []Notice, err error) {
 func (c *PrivateClient) GetNoticesWithDigest() (notices []Notice, digest string, err error) {
 	body, _, err := c.request(http.MethodGet, noticesURL)
 	if err != nil {
-		err = fmt.Errorf("error getting Notices: %w", err)
 		return
 	}
-
 	var resp NoticesResponse
 	if err = json.Unmarshal(body, &resp); err != nil {
-		err = fmt.Errorf("error parsing Notices: %w\n%s", err, string(body))
+		err = fmt.Errorf("fibapi: error parsing Notices: %w", err)
 		return
 	}
 
@@ -74,7 +71,6 @@ func (c *PrivateClient) GetNoticesWithDigest() (notices []Notice, digest string,
 func (c *PrivateClient) GetNotice(ID int32) (notice Notice, err error) {
 	notices, err := c.GetNotices()
 	if err != nil {
-		err = fmt.Errorf("error getting Notices: %w", err)
 		return
 	}
 
@@ -91,49 +87,47 @@ func (c *PrivateClient) GetNotice(ID int32) (notice Notice, err error) {
 func (c *PrivateClient) GetSubjects() ([]Subject, error) {
 	body, _, err := c.request(http.MethodGet, subjectsURL)
 	if err != nil {
-		return nil, fmt.Errorf("error getting Subjects: %w", err)
+		return nil, err
 	}
-
 	var resp SubjectsResponse
 	if err = json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("error parsing Subjects: %w\n%s", err, string(body))
+		return nil, fmt.Errorf("fibapi: error parsing Subjects: %w", err)
 	}
-
 	return resp.Results, nil
 }
 
 // RevokeToken revokes the user's OAuth token
-func (c *PrivateClient) RevokeToken() (err error) {
+func (c *PrivateClient) RevokeToken() error {
 	token, err := c.Client.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
-		return
+		return fmt.Errorf("fibapi: error extracting token: %w", err)
 	}
 
-	_, err = c.Client.PostForm(oAuthRevokeURL, url.Values{
+	_, err = c.Client.PostForm(oauthRevokeURL, url.Values{
 		"client_id": {oauthConf.ClientID},
 		"token":     {token.AccessToken},
 	})
 	if err != nil {
-		err = fmt.Errorf("error revoking token: %w", err)
+		return fmt.Errorf("fibapi: error revoking token: %w", err)
 	}
-	return
+	return nil
 }
 
 // GetAttachmentFile gets the given Attachment's bytes
 // BE CAREFUL: some attachments posted on racó are copyright-protected and should not be stored nor accessed by third-parties
-func (c *PrivateClient) GetAttachmentFile(a Attachment) ([]byte, error) {
-	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
-	if err != nil {
-		return nil, fmt.Errorf("error getting Attachment: %w", err)
-	}
-
-	return body, nil
+func (c *PrivateClient) GetAttachmentFile(a Attachment) (body []byte, err error) {
+	body, _, err = c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
+	return
 }
 
 // request makes a request to Private FIB API using the given HTTP method and URL
 func (c *PrivateClient) request(method, URL string) (body []byte, header http.Header, err error) {
-	req, err := http.NewRequest(method, URL, nil)
+	ctx, cancel := context.WithTimeout(c.ctx, requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, URL, nil)
 	if err != nil {
+		err = fmt.Errorf("fibapi: error creating request: %w", err)
 		return
 	}
 	for k, v := range requestHeaders {
@@ -142,13 +136,21 @@ func (c *PrivateClient) request(method, URL string) (body []byte, header http.He
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return
-	}
-
-	defer resp.Body.Close()
-	body, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return
+		if rErr, ok := err.(*url.Error).Err.(*oauth2.RetrieveError); ok { // API error, pass it to later handling
+			resp = rErr.Response
+			body = rErr.Body
+			err = nil
+		} else {
+			err = fmt.Errorf("fibapi: error making request: %w", err)
+			return
+		}
+	} else {
+		defer resp.Body.Close()
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			err = fmt.Errorf("fibapi: error reading response body: %w", err)
+			return
+		}
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -157,11 +159,10 @@ func (c *PrivateClient) request(method, URL string) (body []byte, header http.He
 			// token has expired or has been revoked on server
 			err = ErrAuthorizationExpired
 		} else {
-			// TODO: handle more other errors
-			err = ErrUnknown
+			err = fmt.Errorf("fibapi: bad response (%d): %s", resp.StatusCode, string(body))
 		}
 	}
 
-	header = resp.Header
+	header = resp.Header // return response header for future error handling
 	return
 }

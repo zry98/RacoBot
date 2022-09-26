@@ -6,7 +6,10 @@ package fibapi
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -18,10 +21,12 @@ type Config struct {
 	OAuthClientSecret string `toml:"oauth_client_secret"`
 	OAuthRedirectURI  string `toml:"oauth_redirect_uri"`
 	PublicClientID    string `toml:"public_client_id"`
+	ClientUserAgent   string `toml:"client_user_agent,omitempty"`
 }
 
 var (
 	oauthConf *oauth2.Config
+
 	// HTTP request headers to send
 	requestHeaders = map[string]string{
 		"Accept":          "application/json",
@@ -32,13 +37,21 @@ var (
 
 // Init initializes the FIB API clients
 func Init(config Config) {
+	u, err := url.Parse(BaseURL)
+	if err != nil {
+		panic(err)
+	}
+	if config.ClientUserAgent != "" {
+		requestHeaders["User-Agent"] = config.ClientUserAgent
+	}
+
 	// private API client
 	oauthConf = &oauth2.Config{
 		ClientID:     config.OAuthClientID,
 		ClientSecret: config.OAuthClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:   oAuthAuthURL,
-			TokenURL:  oAuthTokenURL,
+			AuthURL:   oauthAuthURL,
+			TokenURL:  oauthTokenURL,
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 		RedirectURL: config.OAuthRedirectURI,
@@ -50,8 +63,10 @@ func Init(config Config) {
 	publicClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				ServerName: serverName,
+				ServerName: u.Hostname(),
+				// TODO: change min and max version to TLS 1.3 when FIB API server supports it
 				MinVersion: tls.VersionTLS12,
+				MaxVersion: tls.VersionTLS12,
 			},
 			ForceAttemptHTTP2: false,
 		},
@@ -66,17 +81,16 @@ func NewAuthorizationURL(state string) string {
 
 // Authorize tries to retrieve OAuth token with the given Authorization Code
 func Authorize(authorizationCode string) (token *oauth2.Token, userInfo UserInfo, err error) {
-	ctx := context.Background() // TODO: use context
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
 	token, err = oauthConf.Exchange(ctx, authorizationCode)
 	if err != nil {
-		if errData, ok := err.(*oauth2.RetrieveError); ok && errData.Response.StatusCode == http.StatusBadRequest &&
-			string(errData.Body) == OAuthInvalidAuthorizationCodeResponse {
-			err = ErrInvalidAuthorizationCode
-		}
+		err = ProcessTokenError(err)
 		return
 	}
 
-	// try to make an API call to get UserInfo, thus can check if the retrieved token is really valid
+	// try to get UserInfo and check if the retrieved token is really valid
 	userInfo, err = NewClient(*token).GetUserInfo()
 	if err != nil {
 		return
@@ -85,4 +99,24 @@ func Authorize(authorizationCode string) (token *oauth2.Token, userInfo UserInfo
 		err = ErrInvalidAuthorizationCode
 	}
 	return
+}
+
+// ProcessTokenError returns a more specific error from the given error
+func ProcessTokenError(err error) error {
+	if rErr, ok := err.(*oauth2.RetrieveError); ok && rErr.Response.StatusCode == http.StatusBadRequest {
+		var resp Response
+		if err = json.Unmarshal(rErr.Body, &resp); err != nil {
+			return fmt.Errorf("fibapi: error parsing response: %w", err)
+		}
+		if resp.Error == oauthInvalidAuthorizationCodeResponseErrorMessage {
+			return ErrInvalidAuthorizationCode
+		} else {
+			if resp.Error == "" {
+				resp.Error = "(no error message)"
+			}
+			return fmt.Errorf("fibapi: error retrieving token: %s", resp.Error)
+		}
+	} else {
+		return fmt.Errorf("fibapi: error retrieving token: %w", err)
+	}
 }
