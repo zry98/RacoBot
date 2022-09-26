@@ -3,7 +3,7 @@ package locales
 import tb "gopkg.in/telebot.v3"
 
 var es = Locale{
-	StartMessage:                        "Por favor /login para autorizar Racó Bot.",
+	StartMessage:                        "Por favor, /login para autorizar Racó Bot.",
 	Authorized:                          "Autorizado",
 	AuthorizedResponseMessage:           "Ya puedes cerrar esta pestaña del navegador y volver a Telegram.",
 	GreetingMessage:                     "¡Hola, %s!",
@@ -14,12 +14,12 @@ var es = Locale{
 	NoticeMessageOriginalLinkText:       "Enlace",
 	NoticeMessageAttachmentNounSingular: "adjunto",
 	NoticeMessageAttachmentNounPlural:   "adjuntos",
-	NoticeMessageAttachmentListHeader:   "📎 <i>Con %d %s:</i>",
-	NoticeMessageTooLongErrorMessage:    "🤖 <i>Lo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href=\"%s\">este enlace</a>.</i>",
+	NoticeMessageAttachmentListHeader:   "<i>📎 Con %d %s:</i>",
+	NoticeMessageTooLongErrorMessage:    "🤖 Lo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href=\"%s\">este enlace</a>.",
 	NoticeUnavailableErrorMessage:       "<i>Aviso no disponible</i>",
 	NoAvailableNoticesErrorMessage:      "<i>No hay avisos disponibles</i>",
-	InternalErrorMessage:                "🤖 <i>Se ha producido un error interno</i>",
-	FIBAPIAuthorizationExpiredMessage:   "La autorización ha caducado, por favor /login para iniciar la sesión de nuevo.",
+	InternalErrorMessage:                "<i>Se ha producido un error interno</i>",
+	FIBAPIAuthorizationExpiredMessage:   "<i>La autorización ha caducado, por favor /login para iniciar la sesión de nuevo.</i>",
 	LoginLinkMessage:                    "<a href=\"%s\">Autorizar Racó Bot</a>",
 	SelectPreferredLanguageMenuText:     "Selecciona el idioma que prefieras:",
 	LanguageUnavailableErrorMessage:     "<i>Idioma no disponible</i>",

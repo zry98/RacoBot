@@ -3,7 +3,7 @@ package locales
 import tb "gopkg.in/telebot.v3"
 
 var ca = Locale{
-	StartMessage:                        "Si us plau /login per autoritzar Racó Bot.",
+	StartMessage:                        "Si us plau, /login per autoritzar Racó Bot.",
 	Authorized:                          "Autoritzat",
 	AuthorizedResponseMessage:           "Ja pots tancar aquesta pestanya del navegador i tornar a Telegram.",
 	GreetingMessage:                     "Hola, %s!",
@@ -14,12 +14,12 @@ var ca = Locale{
 	NoticeMessageOriginalLinkText:       "Enllaç",
 	NoticeMessageAttachmentNounSingular: "adjunt",
 	NoticeMessageAttachmentNounPlural:   "adjunts",
-	NoticeMessageAttachmentListHeader:   "📎 <i>Amb %d %s:</i>",
-	NoticeMessageTooLongErrorMessage:    "🤖 <i>Ho sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau veges-lo a través <a href=\"%s\">d'aquest enllaç</a>.</i>",
+	NoticeMessageAttachmentListHeader:   "<i>📎 Amb %d %s:</i>",
+	NoticeMessageTooLongErrorMessage:    "🤖 Ho sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau veges-lo a través <a href=\"%s\">d'aquest enllaç</a>.",
 	NoticeUnavailableErrorMessage:       "<i>Avís no disponible</i>",
 	NoAvailableNoticesErrorMessage:      "<i>No hi ha avisos disponibles</i>",
-	InternalErrorMessage:                "🤖 <i>S'ha produït un error intern</i>",
-	FIBAPIAuthorizationExpiredMessage:   "L'autorització ha caducat, si us plau /login per iniciar la sessió de nou.",
+	InternalErrorMessage:                "<i>S'ha produït un error intern</i>",
+	FIBAPIAuthorizationExpiredMessage:   "<i>L'autorització ha caducat, si us plau /login per iniciar la sessió de nou.</i>",
 	LoginLinkMessage:                    "<a href=\"%s\">Autoritzar Racó Bot</a>",
 	SelectPreferredLanguageMenuText:     "Selecciona l'idioma que prefereixis:",
 	LanguageUnavailableErrorMessage:     "<i>Idioma no disponible</i>",
