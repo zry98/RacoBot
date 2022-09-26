@@ -33,7 +33,7 @@ func PushNewNotices() {
 			// possible database corruption
 			userLogger.Error("failed to create client")
 			// ask the user to re-login to fix it
-			bot.SendMessage(userID, locales.Get("default").FIBAPIAuthorizationExpiredMessage)
+			bot.SendMessage(userID, &bot.ErrorMessage{locales.Get("default").FIBAPIAuthorizationExpiredMessage})
 			if err = db.DeleteUser(userID); err != nil {
 				logger.Errorf("failed to delete user %d: %v", userID, err)
 			}
@@ -45,7 +45,7 @@ func PushNewNotices() {
 			if e == fibapi.ErrAuthorizationExpired {
 				// notify the user that their FIB API authorization has expired and delete them from DB
 				userLogger.Info("token has expired")
-				bot.SendMessage(userID, locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage)
+				bot.SendMessage(userID, &bot.ErrorMessage{locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage})
 				if err = db.DeleteUser(userID); err != nil {
 					logger.Errorf("failed to delete user %d: %v", userID, err)
 				}

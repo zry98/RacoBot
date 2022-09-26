@@ -28,12 +28,12 @@ func Init(config Config) {
 	scheduler.StartAsync()
 }
 
-// Close stops the jobs scheduler
-func Close() {
+// Stop stops the jobs scheduler
+func Stop() {
 	if scheduler != nil {
 		scheduler.Stop()
+		log.Debug("jobs scheduler stopped")
 	}
-	log.Info("jobs scheduler stopped")
 }
 
 // addJobs adds the jobs to the scheduler
