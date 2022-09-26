@@ -14,13 +14,15 @@ import (
 )
 
 var (
-	b *tb.Bot
+	b                  *tb.Bot
+	useLongPoller      bool
+	adminUID           int64
+	WebhookSecretToken string
+	Username           string
+)
 
-	useLongPoller bool
-	SecretToken   string
-	Username      string
-	adminUID      int64
-
+var (
+	// menu keyboard for selecting preferred language
 	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
 	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
 	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
@@ -36,10 +38,10 @@ func HandleUpdate(u Update) {
 
 // Config represents a configuration for Telegram bot
 type Config struct {
-	Token       string `toml:"token"`
-	WebhookURL  string `toml:"webhook_url,omitempty"`
-	SecretToken string `toml:"secret_token,omitempty"`
-	AdminUID    int64  `toml:"admin_uid,omitempty"`
+	AdminUID           int64  `toml:"admin_uid,omitempty"`
+	Token              string `toml:"token"`
+	WebhookURL         string `toml:"webhook_url,omitempty"`
+	WebhookSecretToken string `toml:"webhook_secret_token,omitempty"`
 }
 
 // Init initializes the bot
@@ -89,7 +91,7 @@ func Init(config Config) {
 		if err != nil {
 			fatalf("failed to parse webhook URL: %v", err)
 		}
-		if err = setWebhook(config.WebhookURL, config.SecretToken); err != nil {
+		if err = setWebhook(config.WebhookURL, config.WebhookSecretToken); err != nil {
 			fatalf("failed to set webhook: %v", err)
 		}
 		// waiting for telebot to implement webhook secret token (https://github.com/tucnak/telebot/pull/543)
@@ -97,13 +99,13 @@ func Init(config Config) {
 		//	Listen:        config.WebhookURL,
 		//	DropUpdates:   false,
 		//	HasCustomCert: false,
-		//	SecretToken:   config.SecretToken,
+		//	WebhookSecretToken:   config.WebhookSecretToken,
 		//}); err != nil {
 		//	fatalf("failed to set webhook: %v", err)
 		//}
 
 		// save secret token for webhook request authentication in HTTP handler
-		SecretToken = config.SecretToken
+		WebhookSecretToken = config.WebhookSecretToken
 		useLongPoller = false
 	}
 

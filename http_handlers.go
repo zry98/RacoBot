@@ -34,7 +34,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if request is legit from Telegram
-	if r.Header.Get(TelegramRequestTokenHeader) != bot.SecretToken {
+	if r.Header.Get(TelegramRequestTokenHeader) != bot.WebhookSecretToken {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
