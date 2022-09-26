@@ -45,9 +45,9 @@ const (
 
 // errors
 var (
-	ErrLoginSessionNotFound = fmt.Errorf("login session not found")
-	ErrUserNotFound         = fmt.Errorf("user not found")
-	ErrSubjectNotFound      = fmt.Errorf("subject not found")
+	ErrLoginSessionNotFound = fmt.Errorf("db: login session not found")
+	ErrUserNotFound         = fmt.Errorf("db: user not found")
+	ErrSubjectNotFound      = fmt.Errorf("db: subject not found")
 )
 
 // NewLoginSession creates a login session for a user with the given ID and language code
@@ -166,6 +166,9 @@ func GetSubjectUPCCode(acronym string) (code uint32, err error) {
 		return
 	}
 	i, err := strconv.ParseUint(value, 10, 32)
+	if err != nil {
+		return
+	}
 	code = uint32(i)
 	return
 }
@@ -182,10 +185,25 @@ func PutSubjectUPCCodes(codes map[string]uint32) error {
 	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		for acronym, code := range codes {
 			key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
-			value := strconv.FormatInt(int64(code), 10)
+			value := strconv.FormatUint(uint64(code), 10)
 			pipe.Set(ctx, key, value, subjectKeyExpiration)
 		}
 		return nil
 	})
 	return err
+}
+
+// DeleteAllSubjectUPCCodes deletes all subject UPC codes
+func DeleteAllSubjectUPCCodes() error {
+	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", subjectKeyPrefix)).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil
+		}
+		return err
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return rdb.Del(ctx, keys...).Err()
 }
