@@ -83,19 +83,21 @@ var (
 )
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
-func (m *NoticeMessage) String() (result string) {
+func (m *NoticeMessage) String() string {
 	locale := locales.Get(m.user.LanguageCode)
+	var sb strings.Builder
 
+	// message header (subject, title, publish time, original link)
 	header := fmt.Sprintf("[#%s] <b>%s</b>\n\n<i>%s</i>  %s",
 		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"), // telegram tags can't contain dashes
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
 		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, locale.NoticeMessageOriginalLinkText))
+	sb.WriteString(header)
 
 	// format body text
 	if m.Text != "" {
-		var err error
-		result, err = hr.RewriteString(
+		text, err := hr.RewriteString(
 			m.Text,
 			&hr.Handlers{
 				ElementContentHandler: []hr.ElementContentHandler{
@@ -272,15 +274,15 @@ func (m *NoticeMessage) String() (result string) {
 
 		// unescape HTML entities except `&lt;`, `&gt;`, `&amp;` and `&quot;`
 		// FIXME: too janky
-		result = htmlEntityReplaceExcluder.Replace(result)
-		result = html.UnescapeString(result) // unescape other HTML entities
-		result = htmlEntityReplaceRestorer.Replace(result)
+		text = htmlEntityReplaceExcluder.Replace(text)
+		text = html.UnescapeString(text) // unescape other HTML entities
+		text = htmlEntityReplaceRestorer.Replace(text)
 
-		result = htmlCommentRegex.ReplaceAllString(result, "") // remove HTML comments
-		result = strings.Trim(result, "\n\r")                  // remove trailing newlines
+		text = htmlCommentRegex.ReplaceAllString(text, "") // remove HTML comments
+		text = strings.Trim(text, "\n\r")                  // remove trailing newlines
+		sb.WriteString("\n\n")
+		sb.WriteString(text)
 	}
-
-	result = fmt.Sprintf("%s\n\n%s", header, result)
 
 	// append attachments if there are any
 	if len(m.Attachments) != 0 {
@@ -293,25 +295,23 @@ func (m *NoticeMessage) String() (result string) {
 			})
 		}
 
-		var sb strings.Builder
+		var sbA strings.Builder
 		for _, attachment := range m.Attachments {
 			fileSize := strings.ReplaceAll(byteCountIEC(attachment.Size), ".", string(locale.DecimalSeparator))
-			fmt.Fprintf(&sb, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
+			fmt.Fprintf(&sbA, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
-
-		result = fmt.Sprintf("%s\n\n%s\n%s",
-			result,
+		fmt.Fprintf(&sb, "\n\n%s\n%s",
 			fmt.Sprintf(locale.NoticeMessageAttachmentListHeader, len(m.Attachments), noun),
-			strings.TrimSuffix(sb.String(), "\n"))
+			strings.TrimSuffix(sbA.String(), "\n"))
 	}
 
 	// send racó notice URL instead if message length exceeds the limit
-	if len(result) > messageMaxLength {
-		result = fmt.Sprintf("%s\n\n%s",
+	if sb.Len() > messageMaxLength {
+		return fmt.Sprintf("%s\n\n%s",
 			header,
 			fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, m.linkURL))
 	}
-	return
+	return sb.String()
 }
 
 // byteCountIEC returns the human-readable file size of the given bytes count

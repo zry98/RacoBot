@@ -56,7 +56,7 @@ func TestNoticeMessage_String(t *testing.T) {
 		fmt.Sprintf("{\"id\": 126418,\"titol\": \"Notes finals definitives\",\"codi_assig\": \"AC\",\"text\": \"%s\",\"data_insercio\": \"2022-06-27T08:01:21\",\"data_modificacio\": \"2022-06-27T08:01:21\",\"data_caducitat\": \"2022-08-26T08:01:21\",\"adjunts\": []}", tooLongText),
 		270018,
 		"ca",
-		"[#AC] <b>Notes finals definitives</b>\n\n<i>27/06/2022 08:01:21</i>  <a href=\"https://raco.fib.upc.edu/avisos/veure.jsp?espai=270018&id=126418\">Enllaç</a>\n\nHo sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau consulteu-lo a través <a href=\"https://raco.fib.upc.edu/avisos/veure.jsp?espai=270018&id=126418\">d'aquest enllaç</a>.",
+		"[#AC] <b>Notes finals definitives</b>\n\n<i>27/06/2022 08:01:21</i>  <a href=\"https://raco.fib.upc.edu/avisos/veure.jsp?espai=270018&id=126418\">Enllaç</a>\n\n🤖 Ho sento, però aquest missatge és massa llarg per enviar-lo per Telegram, si us plau veges-lo a través <a href=\"https://raco.fib.upc.edu/avisos/veure.jsp?espai=270018&id=126418\">d'aquest enllaç</a>.",
 	})
 
 	for _, tt := range tests {
