@@ -30,14 +30,12 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintln(w)
 		return
 	}
 
 	// check if request is legit from Telegram
 	if r.Header.Get(TelegramRequestTokenHeader) != bot.SecretToken {
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintln(w)
 		return
 	}
 
@@ -45,7 +43,6 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("failed to read request body: %v", err)
-		fmt.Fprintln(w)
 		return
 	}
 
@@ -54,7 +51,6 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"IP": r.RemoteAddr,
 		}).Errorf("invalid update: %v", err)
-		fmt.Fprintln(w)
 		return
 	}
 
@@ -67,22 +63,17 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"IP": r.RemoteAddr,
 		}).Error("invalid update: no message or callback")
-		fmt.Fprintln(w)
 		return
 	}
 	if userID != 0 && !rl.BotUpdateAllowed(r.Context(), userID) {
 		log.WithFields(log.Fields{
 			"UID": userID,
 		}).Info("rate limited")
-		fmt.Fprintln(w)
 		return
 	}
 
-	// use goroutine to handle the update in the background and return a response to the webhook request ASAP
+	// handle the update in the background and respond to the webhook request ASAP
 	go bot.HandleUpdate(update)
-
-	fmt.Fprintln(w)
-	return
 }
 
 // HandleOAuthRedirect handles an incoming FIB API OAuth redirect request
@@ -140,7 +131,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		})
 		if err == fibapi.ErrInvalidAuthorizationCode {
 			logger.Info("invalid OAuth redirect request: invalid authorization code")
-			w.WriteHeader(http.StatusUnauthorized)
+			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
 		} else {
 			logger.Errorf("failed to authorize: %v", err)
@@ -173,6 +164,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 	bot.DeleteLoginLinkMessage(loginSession)
 
+	log.Infof("user %d logged in", loginSession.UserID)
 	greetingMessage := fmt.Sprintf("%s\n\n%s",
 		fmt.Sprintf(locales.Get(loginSession.UserLanguageCode).GreetingMessage, userInfo.FirstName),
 		locales.Get(loginSession.UserLanguageCode).HelpMessage)
@@ -185,8 +177,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		bot.Username,
 		locales.Get(loginSession.UserLanguageCode).Authorized,
 		locales.Get(loginSession.UserLanguageCode).AuthorizedResponseMessage)
-	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, 301)
-	return
+	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, http.StatusMovedPermanently)
 }
 
 // middleware provides some useful middlewares for the server
