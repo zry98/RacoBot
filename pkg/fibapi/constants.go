@@ -28,7 +28,7 @@ const (
 )
 
 const (
-	requestTimeout          = 3 * time.Second
+	requestTimeout          = 5 * time.Second
 	publicAPIClientIDHeader = "client_id"
 
 	oauthInvalidAuthorizationCodeResponseErrorMessage = "invalid_grant"

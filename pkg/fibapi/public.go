@@ -18,7 +18,7 @@ var (
 func GetPublicSubjects() ([]PublicSubject, error) {
 	deadline := 20 * time.Second
 
-	var saidTotal int
+	var saidTotal uint32
 	var subjects []PublicSubject
 
 	URL := publicSubjectsURL
@@ -38,10 +38,10 @@ func GetPublicSubjects() ([]PublicSubject, error) {
 		}
 
 		if saidTotal == 0 {
-			saidTotal = int(resp.Count)
+			saidTotal = resp.Count
 			subjects = make([]PublicSubject, 0, saidTotal)
-		} else if int(resp.Count) != saidTotal {
-			return nil, fmt.Errorf("fibapi: error fetching PublicSubjects: unexpected total count change")
+		} else if resp.Count != saidTotal {
+			return nil, fmt.Errorf("fibapi: error fetching PublicSubjects: said total changed during fetching")
 		}
 		subjects = append(subjects, resp.Results...)
 
@@ -50,7 +50,7 @@ func GetPublicSubjects() ([]PublicSubject, error) {
 		}
 		URL = resp.NextURL // continue to fetch the next page
 	}
-	if len(subjects) != saidTotal {
+	if uint32(len(subjects)) != saidTotal {
 		return nil, fmt.Errorf("fibapi: error fetching PublicSubjects: said total %d, got %d", saidTotal, len(subjects))
 	}
 	return subjects, nil

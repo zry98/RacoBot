@@ -107,7 +107,7 @@ func (c *Config) setupLogger() {
 		log.Fatalf("failed to parse log level: %v", err)
 	}
 	log.SetLevel(level)
-	log.Infof("log level set to %s", strings.ToUpper(level.String()))
+	log.Debugf("log level set to %s", strings.ToUpper(level.String()))
 	if level >= log.DebugLevel {
 		log.SetReportCaller(true)
 	}

@@ -32,7 +32,7 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if request is legit from Telegram
-	if r.Header.Get(TelegramRequestTokenHeader) != bot.WebhookSecretToken {
+	if bot.WebhookSecretToken != "" && r.Header.Get(TelegramRequestTokenHeader) != bot.WebhookSecretToken {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -41,6 +41,9 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("failed to read request body: %v", err)
+		return
+	}
+	if len(body) == 0 { // getting an additional empty request after normal update when using Cloudflare proxy, weird
 		return
 	}
 
@@ -166,15 +169,16 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	greetingMessage := fmt.Sprintf("%s\n\n%s",
 		fmt.Sprintf(locales.Get(loginSession.UserLanguageCode).GreetingMessage, userInfo.FirstName),
 		locales.Get(loginSession.UserLanguageCode).HelpMessage)
-	bot.SendMessage(loginSession.UserID, greetingMessage)
+	_ = bot.SendMessage(loginSession.UserID, greetingMessage)
 
 	// respond HTML with authorized message
 	// meanwhile make 301 redirect to let user back to the chat using Telegram URI scheme
-	fmt.Fprintf(w, AuthorizedResponseBodyTemplate,
-		loginSession.UserLanguageCode,
-		bot.Username,
-		locales.Get(loginSession.UserLanguageCode).Authorized,
-		locales.Get(loginSession.UserLanguageCode).AuthorizedResponseMessage)
+	//fmt.Fprintf(w, AuthorizedResponseBodyTemplate,
+	//	loginSession.UserLanguageCode,
+	//	bot.Username,
+	//	locales.Get(loginSession.UserLanguageCode).Authorized,
+	//	locales.Get(loginSession.UserLanguageCode).AuthorizedResponseMessage)
+	// TODO: check if 301 URI scheme redirect works well on all platforms
 	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, http.StatusMovedPermanently)
 }
 
