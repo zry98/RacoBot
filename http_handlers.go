@@ -21,7 +21,7 @@ const (
 	RateLimitedResponseBody         = "Rate limited"
 	TelegramRequestTokenHeader      = "X-Telegram-Bot-Api-Secret-Token"
 	InvalidOAuthRequestResponseBody = "Authorization failed (invalid request)"
-	AuthorizedResponseBodyTemplate  = "<!DOCTYPE html><html lang=\"%s\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=tg://resolve?domain=%s\"><title>Racó Bot</title></head><body><h1>%s</h1><p>%s</p></body></html>\n"
+	//AuthorizedResponseBodyTemplate  = "<!DOCTYPE html><html lang=\"%s\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=tg://resolve?domain=%s\"><title>Racó Bot</title></head><body><h1>%s</h1><p>%s</p></body></html>\n"
 )
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
@@ -87,7 +87,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-	if code == "" || state == "" || r.Header.Get("referer") != fibapi.BaseURL {
+	if code == "" || len(state) != db.OAuthStateBase64EncodedLength || r.Header.Get("referer") != fibapi.BaseURL {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
 		return
@@ -156,7 +156,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.DeleteLoginSession(state)
+	err = db.DelLoginSession(state)
 	if err != nil {
 		log.Errorf("failed to delete login session %s: %v", state, err)
 		w.WriteHeader(http.StatusInternalServerError)

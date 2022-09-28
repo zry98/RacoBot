@@ -33,14 +33,16 @@ type User struct {
 
 // key prefixes
 const (
-	loginSessionKeyPrefix = "l"
-	userKeyPrefix         = "u"
-	subjectKeyPrefix      = "s"
+	prefixLoginSession = "l"
+	prefixUser         = "u"
+	prefixSubjectCode  = "s"
 )
 
 // key expirations
 const (
-	subjectKeyExpiration = time.Hour * 24 * 150 // 150 days
+	ttlLoginSession = 10 * time.Minute     // 10 minutes
+	ttlUser         = 0 * time.Second      // no expiration
+	ttlSubjectCode  = time.Hour * 24 * 150 // 150 days
 )
 
 // errors
@@ -50,10 +52,15 @@ var (
 	ErrSubjectNotFound      = fmt.Errorf("db: subject not found")
 )
 
+const (
+	oauthStateLength              = 15 // no padding
+	OAuthStateBase64EncodedLength = ((4 * oauthStateLength / 3) + 3) & ^3
+)
+
 // NewLoginSession creates a login session for a user with the given ID and language code
 func NewLoginSession(userID int64, languageCode string) (s LoginSession, err error) {
 	// make a random string as state
-	buf := make([]byte, 16)
+	buf := make([]byte, oauthStateLength)
 	_, err = rand.Read(buf)
 	if err != nil {
 		return
@@ -69,7 +76,7 @@ func NewLoginSession(userID int64, languageCode string) (s LoginSession, err err
 
 // GetLoginSession gets a login session with the given state
 func GetLoginSession(state string) (s LoginSession, err error) {
-	key := fmt.Sprintf("%s:%s", loginSessionKeyPrefix, state)
+	key := fmt.Sprintf("%s:%s", prefixLoginSession, state)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -86,23 +93,23 @@ func GetLoginSession(state string) (s LoginSession, err error) {
 
 // PutLoginSession puts the given login session
 func PutLoginSession(s LoginSession) error {
-	key := fmt.Sprintf("%s:%s", loginSessionKeyPrefix, s.State)
+	key := fmt.Sprintf("%s:%s", prefixLoginSession, s.State)
 	value, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
-	return rdb.Set(ctx, key, value, 10*time.Minute).Err() // expires in 10 minutes
+	return rdb.Set(ctx, key, value, ttlLoginSession).Err()
 }
 
-// DeleteLoginSession deletes a login session with the given state
-func DeleteLoginSession(state string) error {
-	key := fmt.Sprintf("%s:%s", loginSessionKeyPrefix, state)
+// DelLoginSession deletes a login session with the given state
+func DelLoginSession(state string) error {
+	key := fmt.Sprintf("%s:%s", prefixLoginSession, state)
 	return rdb.Del(ctx, key).Err()
 }
 
 // GetUser gets a user with the given ID
 func GetUser(userID int64) (user User, err error) {
-	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
+	key := fmt.Sprintf("%s:%d", prefixUser, userID)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -119,23 +126,25 @@ func GetUser(userID int64) (user User, err error) {
 
 // PutUser puts the given user
 func PutUser(user User) error {
-	key := fmt.Sprintf("%s:%d", userKeyPrefix, user.ID)
+	key := fmt.Sprintf("%s:%d", prefixUser, user.ID)
 	value, err := json.Marshal(user)
 	if err != nil {
 		return err
 	}
-	return rdb.Set(ctx, key, value, 0).Err()
+	return rdb.Set(ctx, key, value, ttlUser).Err()
 }
 
-// DeleteUser deletes a user with the given ID
-func DeleteUser(userID int64) error {
-	key := fmt.Sprintf("%s:%d", userKeyPrefix, userID)
+// DelUser deletes a user with the given ID
+// TODO: add userIDs to a set?
+func DelUser(userID int64) error {
+	key := fmt.Sprintf("%s:%d", prefixUser, userID)
 	return rdb.Del(ctx, key).Err()
 }
 
 // GetAllUserIDs gets all user IDs
+// TODO: get userIDs from a set?
 func GetAllUserIDs() (userIDs []int64, err error) {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", userKeyPrefix)).Result()
+	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", prefixUser)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			err = nil
@@ -146,7 +155,7 @@ func GetAllUserIDs() (userIDs []int64, err error) {
 	userIDs = make([]int64, 0, len(keys))
 	var userID int64
 	for _, key := range keys {
-		userID, err = strconv.ParseInt(strings.TrimPrefix(key, userKeyPrefix+":"), 10, 64)
+		userID, err = strconv.ParseInt(strings.TrimPrefix(key, prefixUser+":"), 10, 64)
 		if err != nil {
 			return
 		}
@@ -157,7 +166,7 @@ func GetAllUserIDs() (userIDs []int64, err error) {
 
 // GetSubjectUPCCode gets the UPC code of a subject with the given acronym
 func GetSubjectUPCCode(acronym string) (code uint32, err error) {
-	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
+	key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -175,27 +184,27 @@ func GetSubjectUPCCode(acronym string) (code uint32, err error) {
 
 // PutSubjectUPCCode puts the given UPC code of a subject with the given acronym
 func PutSubjectUPCCode(acronym string, code uint32) error {
-	key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
+	key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
 	value := strconv.FormatInt(int64(code), 10)
-	return rdb.Set(ctx, key, value, subjectKeyExpiration).Err()
+	return rdb.Set(ctx, key, value, ttlSubjectCode).Err()
 }
 
 // PutSubjectUPCCodes puts the given subject UPC codes in bulk
 func PutSubjectUPCCodes(codes map[string]uint32) error {
 	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		for acronym, code := range codes {
-			key := fmt.Sprintf("%s:%s", subjectKeyPrefix, acronym)
+			key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
 			value := strconv.FormatUint(uint64(code), 10)
-			pipe.Set(ctx, key, value, subjectKeyExpiration)
+			pipe.Set(ctx, key, value, ttlSubjectCode)
 		}
 		return nil
 	})
 	return err
 }
 
-// DeleteAllSubjectUPCCodes deletes all subject UPC codes
-func DeleteAllSubjectUPCCodes() error {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", subjectKeyPrefix)).Result()
+// DelAllSubjectUPCCodes deletes all subject UPC codes
+func DelAllSubjectUPCCodes() error {
+	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", prefixSubjectCode)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil

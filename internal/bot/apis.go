@@ -58,7 +58,7 @@ func (c *Client) updateToken() {
 		err = fibapi.ProcessTokenError(err)
 		if err == fibapi.ErrInvalidAuthorizationCode {
 			log.Errorf("user %d authorization has expired", c.User.ID)
-			if e := db.DeleteUser(c.User.ID); e != nil {
+			if e := db.DelUser(c.User.ID); e != nil {
 				log.Errorf("failed to delete user %d: %v", c.User.ID, e)
 			}
 		} else {
@@ -179,7 +179,7 @@ func (c *Client) Logout() error {
 	}
 
 	defer func() { // delete user from DB no matter what
-		if e := db.DeleteUser(c.User.ID); e != nil {
+		if e := db.DelUser(c.User.ID); e != nil {
 			log.Errorf("failed to delete user %d: %v", c.User.ID, e)
 		}
 	}()

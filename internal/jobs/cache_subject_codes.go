@@ -21,7 +21,7 @@ func CacheSubjectCodes() {
 	}
 	logger.Infof("fetched %d subjects in %v", len(subjects), time.Since(start))
 
-	if err = db.DeleteAllSubjectUPCCodes(); err != nil {
+	if err = db.DelAllSubjectUPCCodes(); err != nil {
 		logger.Errorf("failed to purge subject codes: %v", err)
 		return
 	}

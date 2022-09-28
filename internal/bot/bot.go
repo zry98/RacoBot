@@ -155,7 +155,7 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 			}
 			if err == fibapi.ErrAuthorizationExpired {
 				log.Infof("user %d authorization has expired", c.Sender().ID)
-				if e := db.DeleteUser(c.Sender().ID); e != nil {
+				if e := db.DelUser(c.Sender().ID); e != nil {
 					log.Errorf("failed to delete user %d: %v", c.Sender().ID, e)
 				}
 				return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})

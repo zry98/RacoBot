@@ -36,7 +36,7 @@ func PushNewNotices() {
 			_ = bot.SendMessage(userID, &bot.ErrorMessage{
 				Text: locales.Get("default").FIBAPIAuthorizationExpiredMessage,
 			})
-			if err = db.DeleteUser(userID); err != nil {
+			if err = db.DelUser(userID); err != nil {
 				logger.Errorf("failed to delete user %d: %v", userID, err)
 			}
 			continue
@@ -52,7 +52,7 @@ func PushNewNotices() {
 					Text: locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage,
 				}) != nil {
 					// delete them from DB if the notification was sent successfully
-					if err = db.DeleteUser(userID); err != nil {
+					if err = db.DelUser(userID); err != nil {
 						logger.Errorf("failed to delete user %d: %v", userID, err)
 					}
 				}

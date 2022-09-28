@@ -19,7 +19,7 @@ type Config struct {
 }
 
 var (
-	ctx         = context.Background() // TODO: use contexts properly
+	ctx         = context.Background()
 	rdb         *redis.Client
 	RateLimiter *redis_rate.Limiter
 )

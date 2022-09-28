@@ -28,11 +28,12 @@ const (
 )
 
 const (
-	requestTimeout          = 5 * time.Second
-	publicAPIClientIDHeader = "client_id"
-
 	oauthInvalidAuthorizationCodeResponseErrorMessage = "invalid_grant"
 	resourceNotFoundResponseDetail                    = "Not found."
+
+	publicAPIClientIDHeader = "client_id"
+
+	requestTimeout = 5 * time.Second
 )
 
 // errors
