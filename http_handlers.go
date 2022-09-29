@@ -66,7 +66,14 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 		}).Error("invalid update: no message or callback")
 		return
 	}
-	if userID != 0 && !rl.BotUpdateAllowed(r.Context(), userID) {
+	if userID == 0 {
+		log.WithFields(log.Fields{
+			"IP": r.RemoteAddr,
+		}).Error("invalid update: no sender UID")
+		return
+	}
+
+	if !rl.BotUpdateAllowed(r.Context(), userID) {
 		log.WithFields(log.Fields{
 			"UID": userID,
 		}).Info("rate limited")

@@ -31,11 +31,15 @@ type User struct {
 	LastNoticeTimestamp int64  `json:"t,omitempty"`
 }
 
-// key prefixes
+// key names
 const (
-	prefixLoginSession = "l"
-	prefixUser         = "u"
-	prefixSubjectCode  = "s"
+	keySubjectCodes = "subject_codes"
+)
+
+// key name prefixes
+const (
+	keyPrefixLoginSession = "l"
+	keyPrefixUser         = "u"
 )
 
 // key expirations
@@ -53,8 +57,8 @@ var (
 )
 
 const (
-	oauthStateLength              = 15 // no padding
-	OAuthStateBase64EncodedLength = ((4 * oauthStateLength / 3) + 3) & ^3
+	oauthStateLength              = 15                                    // no padding
+	OAuthStateBase64EncodedLength = ((4 * oauthStateLength / 3) + 3) & ^3 // for use in HTTP handler
 )
 
 // NewLoginSession creates a login session for a user with the given ID and language code
@@ -76,7 +80,7 @@ func NewLoginSession(userID int64, languageCode string) (s LoginSession, err err
 
 // GetLoginSession gets a login session with the given state
 func GetLoginSession(state string) (s LoginSession, err error) {
-	key := fmt.Sprintf("%s:%s", prefixLoginSession, state)
+	key := fmt.Sprintf("%s:%s", keyPrefixLoginSession, state)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -93,7 +97,7 @@ func GetLoginSession(state string) (s LoginSession, err error) {
 
 // PutLoginSession puts the given login session
 func PutLoginSession(s LoginSession) error {
-	key := fmt.Sprintf("%s:%s", prefixLoginSession, s.State)
+	key := fmt.Sprintf("%s:%s", keyPrefixLoginSession, s.State)
 	value, err := json.Marshal(s)
 	if err != nil {
 		return err
@@ -103,13 +107,13 @@ func PutLoginSession(s LoginSession) error {
 
 // DelLoginSession deletes a login session with the given state
 func DelLoginSession(state string) error {
-	key := fmt.Sprintf("%s:%s", prefixLoginSession, state)
+	key := fmt.Sprintf("%s:%s", keyPrefixLoginSession, state)
 	return rdb.Del(ctx, key).Err()
 }
 
 // GetUser gets a user with the given ID
 func GetUser(userID int64) (user User, err error) {
-	key := fmt.Sprintf("%s:%d", prefixUser, userID)
+	key := fmt.Sprintf("%s:%d", keyPrefixUser, userID)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -126,7 +130,7 @@ func GetUser(userID int64) (user User, err error) {
 
 // PutUser puts the given user
 func PutUser(user User) error {
-	key := fmt.Sprintf("%s:%d", prefixUser, user.ID)
+	key := fmt.Sprintf("%s:%d", keyPrefixUser, user.ID)
 	value, err := json.Marshal(user)
 	if err != nil {
 		return err
@@ -137,14 +141,14 @@ func PutUser(user User) error {
 // DelUser deletes a user with the given ID
 // TODO: add userIDs to a set?
 func DelUser(userID int64) error {
-	key := fmt.Sprintf("%s:%d", prefixUser, userID)
+	key := fmt.Sprintf("%s:%d", keyPrefixUser, userID)
 	return rdb.Del(ctx, key).Err()
 }
 
 // GetAllUserIDs gets all user IDs
 // TODO: get userIDs from a set?
 func GetAllUserIDs() (userIDs []int64, err error) {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", prefixUser)).Result()
+	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", keyPrefixUser)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			err = nil
@@ -155,7 +159,7 @@ func GetAllUserIDs() (userIDs []int64, err error) {
 	userIDs = make([]int64, 0, len(keys))
 	var userID int64
 	for _, key := range keys {
-		userID, err = strconv.ParseInt(strings.TrimPrefix(key, prefixUser+":"), 10, 64)
+		userID, err = strconv.ParseInt(strings.TrimPrefix(key, keyPrefixUser+":"), 10, 64)
 		if err != nil {
 			return
 		}
@@ -166,8 +170,7 @@ func GetAllUserIDs() (userIDs []int64, err error) {
 
 // GetSubjectUPCCode gets the UPC code of a subject with the given acronym
 func GetSubjectUPCCode(acronym string) (code uint32, err error) {
-	key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
-	value, err := rdb.Get(ctx, key).Result()
+	value, err := rdb.HGet(ctx, keySubjectCodes, acronym).Result()
 	if err != nil {
 		if err == redis.Nil {
 			err = ErrSubjectNotFound
@@ -184,35 +187,23 @@ func GetSubjectUPCCode(acronym string) (code uint32, err error) {
 
 // PutSubjectUPCCode puts the given UPC code of a subject with the given acronym
 func PutSubjectUPCCode(acronym string, code uint32) error {
-	key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
-	value := strconv.FormatInt(int64(code), 10)
-	return rdb.Set(ctx, key, value, ttlSubjectCode).Err()
+	value := strconv.FormatUint(uint64(code), 10)
+	return rdb.HSet(ctx, keySubjectCodes, acronym, value).Err()
 }
 
 // PutSubjectUPCCodes puts the given subject UPC codes in bulk
 func PutSubjectUPCCodes(codes map[string]uint32) error {
-	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		for acronym, code := range codes {
-			key := fmt.Sprintf("%s:%s", prefixSubjectCode, acronym)
-			value := strconv.FormatUint(uint64(code), 10)
-			pipe.Set(ctx, key, value, ttlSubjectCode)
-		}
-		return nil
-	})
-	return err
+	values := make(map[string]interface{}, len(codes))
+	for acronym, code := range codes {
+		values[acronym] = strconv.FormatUint(uint64(code), 10)
+	}
+	if err := rdb.HSet(ctx, keySubjectCodes, values).Err(); err != nil {
+		return err
+	}
+	return rdb.Expire(ctx, keySubjectCodes, ttlSubjectCode).Err()
 }
 
 // DelAllSubjectUPCCodes deletes all subject UPC codes
 func DelAllSubjectUPCCodes() error {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", prefixSubjectCode)).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil
-		}
-		return err
-	}
-	if len(keys) == 0 {
-		return nil
-	}
-	return rdb.Del(ctx, keys...).Err()
+	return rdb.Del(ctx, keySubjectCodes).Err()
 }
