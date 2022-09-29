@@ -80,6 +80,173 @@ var (
 	nestedListItemPrefix      = `    • `
 	htmlEntityReplaceExcluder = strings.NewReplacer("&lt;", "&`lt;", "&gt;", "&`gt;", "&amp;", "&`amp;", "&quot;", "&`quot;")
 	htmlEntityReplaceRestorer = strings.NewReplacer("&`lt;", "&lt;", "&`gt;", "&gt;", "&`amp;", "&amp;", "&`quot;", "&quot;")
+	htmlRewriterHandlers      = hr.Handlers{
+		ElementContentHandler: []hr.ElementContentHandler{
+			{
+				// add newline before exam title
+				Selector: `div[class="extraInfo"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.InsertBeforeStartTagAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// add newline after exam time
+				Selector: `span[id="horaExamen"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.InsertAfterEndTagAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// italicize exam info subtitle
+				Selector: `span[class="label"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.RemoveAttribute("class"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					if err := e.SetTagName("i"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					if err := e.InsertBeforeStartTagAsHTML("- "); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// fix underline
+				Selector: `span[style="text-decoration:underline"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.RemoveAttribute("style"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					if err := e.SetTagName("u"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// fix link with path-only URL
+				Selector: `a[href^="/"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					href, err := e.AttributeValue("href")
+					if err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					if err = e.SetAttribute("href", racoBaseURL+href); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// Telegram doesn't support `<br>` but `\n`
+				Selector: `br`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.ReplaceAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			// Telegram doesn't support lists (`<ul>`, `<ol>` and `<li>`),
+			// so we add a bullet point at the beginning of each item (`<li>`) as an indicator
+			// the following three handlers are for different types of list items
+			// TODO: add numbering to items in ordered lists
+			{
+				// item in nested list, prepend 4 spaces and a bullet point (`    • `)
+				Selector: `li > ul > li`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.InsertBeforeStartTagAsText(nestedListItemPrefix); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					// add newline after each item
+					if err := e.InsertAfterEndTagAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// item in nested list, prepend 4 spaces and a bullet point (`    • `)
+				Selector: `li > ol > li`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.InsertBeforeStartTagAsText(nestedListItemPrefix); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					// add newline after each item
+					if err := e.InsertAfterEndTagAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// item in top-level list, prepend 2 spaces and a bullet point (`  • `)
+				Selector: `li`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					if err := e.InsertBeforeStartTagAsText(topLevelListItemPrefix); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					// add newline after each item
+					if err := e.InsertAfterEndTagAsText("\n"); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
+				// strip all unsupported tags
+				Selector: `*`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					tagName := e.TagName()
+					for _, supportedTagName := range supportedTagNames {
+						if tagName == supportedTagName {
+							return func() hr.RewriterDirective { // strip all attributes the tag has
+								it := e.AttributeIterator()
+								defer it.Free()
+								for {
+									nextAttrib := it.Next()
+									if nextAttrib == nil || (nextAttrib.Name() == "href" && e.TagName() == "a") {
+										break
+									}
+									if err := e.RemoveAttribute(nextAttrib.Name()); err != nil {
+										log.Error(err)
+										return hr.Stop
+									}
+								}
+								return hr.Continue
+							}()
+						}
+					}
+					e.RemoveAndKeepContent()
+					return hr.Continue
+				},
+			},
+		},
+	}
 )
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
@@ -97,178 +264,9 @@ func (m *NoticeMessage) String() string {
 
 	// format body text
 	if m.Text != "" {
-		text, err := hr.RewriteString(
-			m.Text,
-			&hr.Handlers{
-				ElementContentHandler: []hr.ElementContentHandler{
-					{
-						// add newline before exam title
-						Selector: `div[class="extraInfo"]`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.InsertBeforeStartTagAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// add newline after exam time
-						Selector: `span[id="horaExamen"]`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// italicize exam info subtitle
-						Selector: `span[class="label"]`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.RemoveAttribute("class"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							if er := e.SetTagName("i"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							if er := e.InsertBeforeStartTagAsHTML("- "); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// fix underline
-						Selector: `span[style="text-decoration:underline"]`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.RemoveAttribute("style"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							if er := e.SetTagName("u"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// fix link with path-only URL
-						Selector: `a[href^="/"]`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							href, er := e.AttributeValue("href")
-							if er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							if er = e.SetAttribute("href", racoBaseURL+href); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// Telegram doesn't support `<br>` but `\n`
-						Selector: `br`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.ReplaceAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					// Telegram doesn't support lists (`<ul>`, `<ol>` and `<li>`),
-					// so we add a bullet point at the beginning of each item (`<li>`) as an indicator
-					// the following three handlers are for different types of list items
-					// TODO: add numbering to items in ordered lists
-					{
-						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
-						Selector: `li > ul > li`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.InsertBeforeStartTagAsText(nestedListItemPrefix); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							// add newline after each item
-							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// item in nested list, prepend 4 spaces and a bullet point (`    • `)
-						Selector: `li > ol > li`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.InsertBeforeStartTagAsText(nestedListItemPrefix); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							// add newline after each item
-							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// item in top-level list, prepend 2 spaces and a bullet point (`  • `)
-						Selector: `li`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							if er := e.InsertBeforeStartTagAsText(topLevelListItemPrefix); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							// add newline after each item
-							if er := e.InsertAfterEndTagAsText("\n"); er != nil {
-								log.Error(er)
-								return hr.Stop
-							}
-							return hr.Continue
-						},
-					},
-					{
-						// strip all unsupported tags
-						Selector: `*`,
-						ElementHandler: func(e *hr.Element) hr.RewriterDirective {
-							tagName := e.TagName()
-							for _, supportedTagName := range supportedTagNames {
-								if tagName == supportedTagName {
-									return func() hr.RewriterDirective { // strip all attributes the tag has
-										it := e.AttributeIterator()
-										defer it.Free()
-										for {
-											nextAttrib := it.Next()
-											if nextAttrib == nil || (nextAttrib.Name() == "href" && e.TagName() == "a") {
-												break
-											}
-											if er := e.RemoveAttribute(nextAttrib.Name()); er != nil {
-												log.Error(er)
-												return hr.Stop
-											}
-										}
-										return hr.Continue
-									}()
-								}
-							}
-							e.RemoveAndKeepContent()
-							return hr.Continue
-						},
-					},
-				},
-			},
-		)
+		text, err := hr.RewriteString(m.Text, &htmlRewriterHandlers)
 		if err != nil {
-			log.Errorf("error while rewriting notice message text HTML: %v", err)
+			log.Errorf("error rewriting notice message text HTML: %v", err)
 			return fmt.Sprintf("%s\n\n%s", header, locale.InternalErrorMessage)
 		}
 
@@ -295,14 +293,14 @@ func (m *NoticeMessage) String() string {
 			})
 		}
 
-		var sbA strings.Builder
+		var sbAttachments strings.Builder
 		for _, attachment := range m.Attachments {
 			fileSize := strings.ReplaceAll(byteCountIEC(attachment.Size), ".", string(locale.DecimalSeparator))
-			fmt.Fprintf(&sbA, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
+			fmt.Fprintf(&sbAttachments, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
 		}
 		fmt.Fprintf(&sb, "\n\n%s\n%s",
 			fmt.Sprintf(locale.NoticeMessageAttachmentListHeader, len(m.Attachments), noun),
-			strings.TrimSuffix(sbA.String(), "\n"))
+			strings.TrimSuffix(sbAttachments.String(), "\n"))
 	}
 
 	// send racó notice URL instead if message length exceeds the limit
