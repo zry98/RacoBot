@@ -9,7 +9,7 @@ var ca = Locale{
 	GreetingMessage:                     "Hola, %s!",
 	HelpMessage:                         "Pots fer servir:\n/test per obtenir una vista prèvia de l'últim avís.\n/logout per deixar de rebre missatges i revocar l'autorització en el servidor.",
 	AlreadyLoggedInMessage:              "Ja has iniciat la sessió, comprova /whoami; o /logout per revocar l'autorització.",
-	LogoutSucceededMessage:              "Has tancat la sessió amb èxit! I el token de FIB API ha estat revocat al servidor.",
+	LogoutSucceededMessage:              "Has tancat la sessió amb èxit! I el token de FIB API ha estat revocat al servidor, pots fer servir /login per tornar a autoritzar.",
 	LogoutFailedMessage:                 `S'ha produït un error en tancar la sessió. Encara que ja ho va eliminar de la base de dades, pots revocar el token manualment a <a href="https://api.fib.upc.edu/v2/o/authorized_tokens/">l'API de FIB</a> si ho desitges.`,
 	NoticeMessageOriginalLinkText:       "Enllaç",
 	NoticeMessageAttachmentNounSingular: "adjunt",
