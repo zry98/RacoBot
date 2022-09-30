@@ -27,7 +27,6 @@ type User struct {
 	AccessToken         string `json:"a"`
 	RefreshToken        string `json:"r"`
 	LanguageCode        string `json:"l,omitempty"`
-	LastNoticesDigest   string `json:"d,omitempty"`
 	LastNoticeTimestamp int64  `json:"t,omitempty"`
 }
 

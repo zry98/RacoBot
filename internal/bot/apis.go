@@ -142,26 +142,20 @@ func (c *Client) GetNewNotices() (messages []NoticeMessage, err error) {
 	}
 	defer c.updateToken()
 
-	notices, digest, err := c.PrivateClient.GetNoticesWithDigest()
+	notices, err := c.PrivateClient.GetNoticesSince(c.User.LastNoticeTimestamp)
 	if err != nil {
 		return
 	}
-
-	if digest == c.User.LastNoticesDigest { // no change at all
-		return
-	}
-
-	defer func() { // save states to DB
-		c.User.LastNoticesDigest = digest
+	defer func() { // save the last notice's timestamp to DB
 		if len(notices) > 0 {
 			c.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
-		}
-		if e := db.PutUser(c.User); e != nil {
-			log.Errorf("failed to put user %d: %v", c.User.ID, e)
+			if e := db.PutUser(c.User); e != nil {
+				log.Errorf("failed to put user %d: %v", c.User.ID, e)
+			}
 		}
 	}()
 
-	if c.User.LastNoticesDigest != "" && c.User.LastNoticeTimestamp != 0 { // if not a new user
+	if c.User.LastNoticeTimestamp != 0 { // if not a new user, send the new notices
 		messages = make([]NoticeMessage, 0, len(notices))
 		for _, n := range notices {
 			if n.PublishedAt.Unix() > c.User.LastNoticeTimestamp {

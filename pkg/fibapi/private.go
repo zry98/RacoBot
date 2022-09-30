@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"net/http"
 	"net/url"
@@ -43,12 +42,11 @@ func (c *PrivateClient) GetUserInfo() (userInfo UserInfo, err error) {
 
 // GetNotices gets the user's notices
 func (c *PrivateClient) GetNotices() (notices []Notice, err error) {
-	notices, _, err = c.GetNoticesWithDigest()
-	return
+	return c.GetNoticesSince(0)
 }
 
-// GetNoticesWithDigest gets the user's notices with the response body's hash digest
-func (c *PrivateClient) GetNoticesWithDigest() (notices []Notice, digest string, err error) {
+// GetNoticesSince gets the user's notices published since the given timestamp
+func (c *PrivateClient) GetNoticesSince(timestamp int64) (notices []Notice, err error) {
 	body, _, err := c.request(http.MethodGet, noticesURL)
 	if err != nil {
 		return
@@ -59,11 +57,15 @@ func (c *PrivateClient) GetNoticesWithDigest() (notices []Notice, digest string,
 		return
 	}
 
-	notices = resp.Results
+	notices = make([]Notice, 0, len(resp.Results))
+	for _, n := range resp.Results {
+		if n.PublishedAt.Unix() > timestamp {
+			notices = append(notices, n)
+		}
+	}
 	sort.Slice(notices, func(i, j int) bool {
 		return notices[i].PublishedAt.Unix() < notices[j].PublishedAt.Unix()
 	})
-	digest = fmt.Sprintf("%08x", crc32.ChecksumIEEE(body))
 	return
 }
 

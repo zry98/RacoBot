@@ -128,7 +128,7 @@ func test(c tb.Context) error {
 	if client == nil {
 		return ErrUserNotFound
 	}
-	notices, digest, err := client.GetNoticesWithDigest()
+	notices, err := client.PrivateClient.GetNotices()
 	if err != nil {
 		if err == fibapi.ErrAuthorizationExpired {
 			return err
@@ -138,12 +138,11 @@ func test(c tb.Context) error {
 	}
 
 	defer func() { // save states to DB by the way
-		client.User.LastNoticesDigest = digest
 		if len(notices) > 0 {
 			client.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
-		}
-		if e := db.PutUser(client.User); e != nil {
-			log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
+			if e := db.PutUser(client.User); e != nil {
+				log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
+			}
 		}
 	}()
 

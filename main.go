@@ -80,7 +80,6 @@ func main() {
 		<-s
 		cleanup()
 		close(srvShutdown)
-		close(s)
 		os.Exit(0)
 	}()
 
