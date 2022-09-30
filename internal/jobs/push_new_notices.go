@@ -12,7 +12,7 @@ import (
 )
 
 // PushNewNotices checks and pushes new notices for all users
-// TODO: use goroutine to send messages concurrently?
+// TODO: use goroutine to send messages concurrently? (no, it's not worth it, FIB API server has poor concurrency, better reuse connection)
 func PushNewNotices() {
 	logger := log.WithField("job", "PushNewNotices")
 

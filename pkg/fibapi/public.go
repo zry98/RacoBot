@@ -16,7 +16,7 @@ var (
 
 // GetPublicSubjects gets all subjects from the public API
 func GetPublicSubjects() ([]PublicSubject, error) {
-	deadline := 20 * time.Second
+	timeout := httpClientTimeout * 3
 
 	var saidTotal uint32
 	var subjects []PublicSubject
@@ -24,8 +24,8 @@ func GetPublicSubjects() ([]PublicSubject, error) {
 	URL := publicSubjectsURL
 	start := time.Now()
 	for { // loop until all pages are fetched
-		if time.Since(start) > deadline {
-			return nil, fmt.Errorf("fibapi: error fetching PublicSubjects: deadline exceeded")
+		if time.Since(start) > timeout {
+			return nil, fmt.Errorf("fibapi: error fetching PublicSubjects: timed out")
 		}
 
 		body, _, err := requestPublic(http.MethodGet, URL)

@@ -13,8 +13,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// PrivateClient represents a FIB API private app client initialized with a token
-// the token may expire, but the underlying client will try to refresh it in later API requests
+var privateClient *http.Client
+
+// PrivateClient represents a FIB API private app client initialized with a token, usually representing a user,
+// the token may expire, but the underlying OAuth client will try to refresh it in later API requests
 type PrivateClient struct {
 	*http.Client
 	ctx context.Context
@@ -22,7 +24,7 @@ type PrivateClient struct {
 
 // NewClient initializes a FIB API private client with the given OAuth token
 func NewClient(token oauth2.Token) *PrivateClient {
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, privateClient)
 	ts := oauthConf.TokenSource(ctx, &token)
 	client := oauth2.NewClient(ctx, ts)
 	return &PrivateClient{client, ctx}

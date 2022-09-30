@@ -33,7 +33,9 @@ const (
 
 	publicAPIClientIDHeader = "client_id"
 
-	requestTimeout = 5 * time.Second
+	tlsHandshakeTimeout = 5 * time.Second
+	httpClientTimeout   = 20 * time.Second
+	requestTimeout      = 10 * time.Second
 )
 
 // errors

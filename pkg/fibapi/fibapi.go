@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -29,9 +28,8 @@ var (
 
 	// HTTP request headers to send
 	requestHeaders = map[string]string{
-		"Accept":          "application/json",
-		"Accept-Language": "en-US,en;q=0.9",
-		"User-Agent":      "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
+		"Accept":     "application/json",
+		"User-Agent": "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
 	}
 )
 
@@ -45,7 +43,7 @@ func Init(config Config) {
 		requestHeaders["User-Agent"] = config.ClientUserAgent
 	}
 
-	// private API client
+	// private API OAuth config
 	oauthConf = &oauth2.Config{
 		ClientID:     config.OAuthClientID,
 		ClientSecret: config.OAuthClientSecret,
@@ -58,9 +56,8 @@ func Init(config Config) {
 		Scopes:      []string{"read"},
 	}
 
-	// public API client
-	publicClientID = config.PublicClientID
-	publicClient = &http.Client{
+	// private API client
+	privateClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				ServerName: u.Hostname(),
@@ -68,9 +65,25 @@ func Init(config Config) {
 				MinVersion: tls.VersionTLS12,
 				MaxVersion: tls.VersionTLS12,
 			},
-			ForceAttemptHTTP2: false,
+			TLSHandshakeTimeout: tlsHandshakeTimeout,
+			ForceAttemptHTTP2:   false,
 		},
-		Timeout: 10 * time.Second,
+		Timeout: httpClientTimeout,
+	}
+
+	// public API client
+	publicClientID = config.PublicClientID
+	publicClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				ServerName: u.Hostname(),
+				MinVersion: tls.VersionTLS12,
+				MaxVersion: tls.VersionTLS12,
+			},
+			TLSHandshakeTimeout: tlsHandshakeTimeout,
+			ForceAttemptHTTP2:   false,
+		},
+		Timeout: httpClientTimeout,
 	}
 }
 
