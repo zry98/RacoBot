@@ -4,9 +4,9 @@ import tb "gopkg.in/telebot.v3"
 
 // Locale represents a locale (group of translations)
 type Locale struct {
+	DecimalSeparator                    rune
 	StartMessage                        string
-	Authorized                          string
-	AuthorizedResponseMessage           string
+	LoginLinkMessage                    string
 	GreetingMessage                     string
 	HelpMessage                         string
 	AlreadyLoggedInMessage              string
@@ -21,33 +21,26 @@ type Locale struct {
 	NoAvailableNoticesErrorMessage      string
 	InternalErrorMessage                string
 	FIBAPIAuthorizationExpiredMessage   string
-	LoginLinkMessage                    string
 	SelectPreferredLanguageMenuText     string
 	LanguageUnavailableErrorMessage     string
 	PreferredLanguageSetMessage         string
-	DecimalSeparator                    rune
-	CommandsMenu                        []tb.Command
+	//Authorized                          string
+	//AuthorizedResponseMessage           string
+	CommandsMenu []tb.Command
 }
 
-var (
-	defaultLocale *Locale
-	LanguageCodes = [...]string{"ca", "es", "en"}
-)
-
-func init() {
-	defaultLocale = &es
-}
+var LanguageCodes = [...]string{"ca", "es", "en"}
 
 // Get returns a Locale by the given language code
 func Get(languageCode string) *Locale {
 	switch languageCode {
-	case "ca":
-		return &ca
 	case "es":
 		return &es
+	case "ca":
+		return &ca
 	case "en":
 		return &en
 	default:
-		return defaultLocale
+		return &es // default to castellano
 	}
 }
