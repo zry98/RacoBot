@@ -17,7 +17,17 @@ import (
 // start replies with a `/login` message
 // on command `/start`
 func start(c tb.Context) error {
-	return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage) // TODO: make it nicer
+	return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage)
+}
+
+// help replies with a help message
+// on command `/help`
+func help(c tb.Context) error {
+	if client := NewClient(c.Sender().ID); client != nil {
+		return c.Send(locales.Get(client.User.LanguageCode).HelpMessage, tb.NoPreview)
+	} else {
+		return c.Send(locales.Get(c.Sender().LanguageCode).HelpMessage, tb.NoPreview)
+	}
 }
 
 // login replies with a FIB API OAuth authorization link message for the user

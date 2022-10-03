@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"encoding/json"
 	"fmt"
 	"html"
 	"regexp"
@@ -26,19 +25,7 @@ type LoginLinkMessage struct {
 func (m *LoginLinkMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
 	authorizationURL := fibapi.NewAuthorizationURL(m.State)
 	text := fmt.Sprintf(locales.Get(m.UserLanguageCode).LoginLinkMessage, authorizationURL)
-
-	params := map[string]string{
-		"chat_id":    to.Recipient(),
-		"text":       text,
-		"parse_mode": tb.ModeHTML,
-	}
-
-	data, err := b.Raw("sendMessage", params)
-	if err != nil {
-		return nil, err
-	}
-
-	return extractMessage(data)
+	return b.Send(to, text, tb.NoPreview)
 }
 
 // NoticeMessage represents a FIB API Notice message
@@ -50,19 +37,7 @@ type NoticeMessage struct {
 
 // Send sends a NoticeMessage
 func (m *NoticeMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
-	params := map[string]string{
-		"chat_id":                  to.Recipient(),
-		"text":                     m.String(),
-		"parse_mode":               tb.ModeHTML,
-		"disable_web_page_preview": "true",
-	}
-
-	data, err := b.Raw("sendMessage", params)
-	if err != nil {
-		return nil, err
-	}
-
-	return extractMessage(data)
+	return b.Send(to, m.String(), tb.NoPreview)
 }
 
 const (
@@ -333,19 +308,7 @@ type ErrorMessage struct {
 
 // Send sends an ErrorMessage
 func (m *ErrorMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
-	params := map[string]string{
-		"chat_id":                  to.Recipient(),
-		"text":                     m.Text,
-		"parse_mode":               tb.ModeHTML,
-		"disable_web_page_preview": "true",
-	}
-
-	data, err := b.Raw("sendMessage", params)
-	if err != nil {
-		return nil, err
-	}
-
-	return extractMessage(data)
+	return b.Send(to, m.Text, tb.NoPreview)
 }
 
 // SilentMessage represents a message that should be sent with notification disabled
@@ -355,18 +318,7 @@ type SilentMessage struct {
 
 // Send sends a SilentMessage
 func (m *SilentMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
-	params := map[string]string{
-		"chat_id":              to.Recipient(),
-		"text":                 m.Text,
-		"disable_notification": "true",
-	}
-
-	data, err := b.Raw("sendMessage", params)
-	if err != nil {
-		return nil, err
-	}
-
-	return extractMessage(data)
+	return b.Send(to, m.Text, tb.NoPreview, tb.Silent)
 }
 
 // AnnouncementMessage represents an announcement message to be sent to all users
@@ -376,46 +328,10 @@ type AnnouncementMessage struct {
 
 // Send sends an AnnouncementMessage
 func (m *AnnouncementMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
-	params := map[string]string{
-		"chat_id":    to.Recipient(),
-		"text":       m.Text,
-		"parse_mode": tb.ModeHTML,
-	}
-
-	data, err := b.Raw("sendMessage", params)
+	msg, err := b.Send(to, m.Text, tb.NoPreview)
 	if err != nil {
 		return nil, err
 	}
-
-	msg, err := extractMessage(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// pin it
-	err = b.Pin(msg)
+	err = b.Pin(msg) // pin it
 	return msg, err
-}
-
-// extractMessage extracts common Message result from given data.
-// Should be called after extractOk or b.Raw() to handle possible errors.
-// copied from telebot for implementing Sendable interfaces
-// (Source: https://github.com/tucnak/telebot/blob/dd790ca6c1a5b187922415325a2cc2c66e033214/util.go#L110)
-func extractMessage(data []byte) (*tb.Message, error) {
-	var resp struct {
-		Result *tb.Message
-	}
-	if err := json.Unmarshal(data, &resp); err != nil {
-		var resp struct {
-			Result bool
-		}
-		if err := json.Unmarshal(data, &resp); err != nil {
-			return nil, fmt.Errorf("telebot: %w", err)
-		}
-		if resp.Result {
-			return nil, fmt.Errorf("telebot: result is True")
-		}
-		return nil, fmt.Errorf("telebot: %w", err)
-	}
-	return resp.Result, nil
 }

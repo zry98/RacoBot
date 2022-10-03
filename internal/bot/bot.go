@@ -50,6 +50,7 @@ func Init(config Config) {
 	b, err = tb.NewBot(tb.Settings{
 		Token:       config.Token,
 		Synchronous: true,
+		ParseMode:   tb.ModeHTML,
 		Verbose:     log.GetLevel() > log.DebugLevel,
 	})
 	if err != nil {
@@ -59,6 +60,7 @@ func Init(config Config) {
 	// command handlers
 	b.Use(errorInterceptor)
 	b.Handle("/start", start)
+	b.Handle("/help", help)
 	b.Handle("/login", login)
 	b.Handle("/lang", setPreferredLanguage)
 	b.Handle("/whoami", whoami)
@@ -172,7 +174,7 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be called from outside the package
 func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
-	msg, err := b.Send(tb.ChatID(userID), message, opt...)
+	msg, err := b.Send(tb.ChatID(userID), message, append(opt, tb.NoPreview)...)
 	if err != nil {
 		log.Errorf("failed to send message to user %d: %s", userID, err)
 		return nil
