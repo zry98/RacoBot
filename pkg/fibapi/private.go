@@ -66,6 +66,13 @@ func (c *PrivateClient) GetNoticesSince(timestamp int64) (notices []Notice, err 
 		}
 	}
 	sort.Slice(notices, func(i, j int) bool {
+		// sort orders: PublishedAt, SubjectCode, Title
+		if notices[i].PublishedAt.Unix() == notices[j].PublishedAt.Unix() {
+			if notices[i].SubjectCode == notices[j].SubjectCode {
+				return notices[i].Title < notices[j].Title // in line with raco web
+			}
+			return notices[i].SubjectCode < notices[j].SubjectCode
+		}
 		return notices[i].PublishedAt.Unix() < notices[j].PublishedAt.Unix()
 	})
 	return
