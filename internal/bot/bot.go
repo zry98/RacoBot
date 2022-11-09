@@ -3,6 +3,8 @@ package bot
 import (
 	"fmt"
 	"net/url"
+	"reflect"
+	"runtime"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -163,7 +165,8 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 				return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})
 			}
 			if err != ErrInternal {
-				log.Errorf("error in handler: %v", err)
+				handlerName := runtime.FuncForPC(reflect.ValueOf(next).Pointer()).Name()
+				log.Errorf("error in handler %s: %v", handlerName, err)
 			}
 			return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).InternalErrorMessage})
 		}
