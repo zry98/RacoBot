@@ -74,7 +74,7 @@ func TestNoticeMessage_String(t *testing.T) {
 
 			m := &NoticeMessage{
 				Notice:  notice,
-				user:    db.User{LanguageCode: tt.userLangCode},
+				User:    db.User{LanguageCode: tt.userLangCode},
 				linkURL: linkURL,
 			}
 

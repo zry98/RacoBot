@@ -1,9 +1,11 @@
 package jobs
 
 import (
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
@@ -67,7 +69,12 @@ func PushNewNotices() {
 		totalFetchedCount += uint32(len(newNotices))
 		var userSentCount uint32
 		for _, n := range newNotices {
-			if bot.SendMessage(userID, &n) != nil {
+			var sendOptions []interface{}
+			// // disable notification for banner notices if the user has muted them
+			if strings.HasPrefix(n.SubjectCode, "#") && n.User.MuteBannerNotices {
+				sendOptions = append(sendOptions, tb.Silent)
+			}
+			if bot.SendMessage(userID, &n, sendOptions) != nil {
 				userSentCount++
 				totalSentCount++
 			}

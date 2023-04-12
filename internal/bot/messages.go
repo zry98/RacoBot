@@ -31,7 +31,7 @@ func (m *LoginLinkMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions)
 // NoticeMessage represents a FIB API Notice message
 type NoticeMessage struct {
 	fibapi.Notice
-	user    db.User
+	User    db.User
 	linkURL string
 }
 
@@ -226,7 +226,7 @@ var (
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
 func (m *NoticeMessage) String() string {
-	locale := locales.Get(m.user.LanguageCode)
+	locale := locales.Get(m.User.LanguageCode)
 	var sb strings.Builder
 
 	// message header (subject, title, publish time, original link)

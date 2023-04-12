@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"RacoBot/pkg/fibapi"
 )
 
-// Client represents a FIB API client initialized with a Telegram UserID
+// Client represents a FIB API client initialized with a Telegram userID
 type Client struct {
 	fibapi.PrivateClient
 	db.User
@@ -20,12 +21,12 @@ type Client struct {
 
 // errors
 var (
-	ErrUserNotFound = fmt.Errorf("user not found")
-	ErrInternal     = fmt.Errorf("internal error")
+	ErrUserNotFound = errors.New("user not found")
+	ErrInternal     = errors.New("internal error")
 )
 
-// NewClient initializes a FIB API private client with the given Telegram UserID
-// if that UserID doesn't exist in the database, it will return nil and leave it for the later API caller to handle
+// NewClient initializes a FIB API private client with the given Telegram userID
+// if that userID doesn't exist in the database, it will return nil and leave it for the later API caller to handle
 // thus simplifies its usage to: `xxx, err := NewClient(userID).GetXXX()`
 func NewClient(userID int64) *Client {
 	user, err := db.GetUser(userID)

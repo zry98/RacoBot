@@ -1,7 +1,7 @@
 package fibapi
 
 import (
-	"fmt"
+	"errors"
 	"time"
 )
 
@@ -40,8 +40,8 @@ const (
 
 // errors
 var (
-	ErrInvalidAuthorizationCode = fmt.Errorf("fibapi: invalid authorization code")
-	ErrAuthorizationExpired     = fmt.Errorf("fibapi: authorization has expired")
-	ErrNoticeNotFound           = fmt.Errorf("fibapi: notice not found")
-	ErrResourceNotFound         = fmt.Errorf("fibapi: resource not found")
+	ErrInvalidAuthorizationCode = errors.New("fibapi: invalid authorization code")
+	ErrAuthorizationExpired     = errors.New("fibapi: authorization has expired")
+	ErrNoticeNotFound           = errors.New("fibapi: notice not found")
+	ErrResourceNotFound         = errors.New("fibapi: resource not found")
 )
