@@ -1,8 +1,6 @@
 package bot
 
 import (
-	"fmt"
-	"net/url"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -11,7 +9,7 @@ import (
 	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
-	"RacoBot/internal/locales"
+	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -31,11 +29,9 @@ var (
 	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
 )
 
-type Update tb.Update
-
 // HandleUpdate handles a Telegram bot update
-func HandleUpdate(u Update) {
-	b.ProcessUpdate(tb.Update(u))
+func HandleUpdate(u tb.Update) {
+	b.ProcessUpdate(u)
 }
 
 // Config represents a configuration for Telegram bot
@@ -56,10 +52,10 @@ func Init(config Config) {
 		Verbose:     log.GetLevel() > log.DebugLevel,
 	})
 	if err != nil {
-		fatalf("failed to initialize bot: %v", err)
+		log.Fatalf("failed to initialize bot: %v", err)
 	}
 
-	// command handlers
+	// set handlers
 	b.Use(errorInterceptor)
 	b.Handle("/start", start)
 	b.Handle("/help", help)
@@ -78,76 +74,54 @@ func Init(config Config) {
 	b.Handle(&setLanguageButtonEN, setPreferredLanguage)
 
 	// set command menus
-	for _, languageCode := range locales.LanguageCodes {
-		if err = setCommands(locales.Get(languageCode).CommandsMenu, languageCode); err != nil {
-			fatalf("failed to set commands menu for %s: %v", languageCode, err)
+	for _, languageCode := range locale.LanguageCodes {
+		if err = setCommands(locale.Get(languageCode).CommandsMenu, languageCode); err != nil {
+			log.Fatalf("failed to set commands menu for %s: %v", languageCode, err)
 		}
 	}
 
-	if config.WebhookURL == "" {
+	if config.WebhookURL == "" { // get updates via long polling if no webhook URL is given
 		if err = b.RemoveWebhook(true); err != nil {
-			fatalf("failed to delete webhook: %v", err)
+			log.Fatalf("failed to delete webhook: %v", err)
 		}
 		useLongPoller = true
-		b.Start()
-	} else { // get updates from webhook HTTP handler instead of long poller if a URL is provided
-		_, err = url.Parse(config.WebhookURL)
-		if err != nil {
-			fatalf("failed to parse webhook URL: %v", err)
+		go b.Start()
+	} else { // get updates from webhook HTTP handler instead of long poller
+		if _, err = b.Raw("setWebhook", struct {
+			URL         string `json:"url"`
+			SecretToken string `json:"secret_token"`
+		}{config.WebhookURL, config.WebhookSecretToken}); err != nil {
+			log.Fatalf("failed to set webhook: %v", err)
 		}
-		if err = setWebhook(config.WebhookURL, config.WebhookSecretToken); err != nil {
-			fatalf("failed to set webhook: %v", err)
-		}
-		// waiting for telebot to implement webhook secret token (https://github.com/tucnak/telebot/pull/543)
-		//if err = b.SetWebhook(&tb.Webhook{
-		//	Listen:        config.WebhookURL,
-		//	DropUpdates:   false,
-		//	HasCustomCert: false,
-		//	WebhookSecretToken:   config.WebhookSecretToken,
-		//}); err != nil {
-		//	fatalf("failed to set webhook: %v", err)
-		//}
-
+		useLongPoller = false
 		// save secret token for webhook request authentication in HTTP handler
 		WebhookSecretToken = config.WebhookSecretToken
-		useLongPoller = false
 	}
 
 	// save the bot username for later use in login flow callback URL
 	Username = b.Me.Username
 	if Username == "" {
-		fatalf("failed to get bot username")
+		log.Fatalf("failed to get bot username")
 	}
 
 	// save admin UID for later use in authorization middleware
 	adminUID = config.AdminUID
 
-	log.Debug("bot initialized")
+	log.Debug("bot started")
 }
 
 // Stop stops the bot
 func Stop() {
-	if useLongPoller {
-		b.Stop()
-	} else {
-		if err := b.RemoveWebhook(false); err != nil {
-			log.Errorf("failed to delete webhook: %v", err)
+	if b != nil {
+		if useLongPoller {
+			b.Stop()
+		} else {
+			if err := b.RemoveWebhook(false); err != nil {
+				log.Errorf("failed to delete webhook: %v", err)
+			}
 		}
 	}
 	log.Debug("bot stopped")
-}
-
-// setWebhook sets the Telegram bot webhook URL to the given one
-func setWebhook(URL string, secretToken string) error {
-	params := struct {
-		URL         string `json:"url"`
-		SecretToken string `json:"secret_token"`
-	}{
-		URL,
-		secretToken,
-	}
-	_, err := b.Raw("setWebhook", params)
-	return err
 }
 
 // errorInterceptor is a middleware that intercepts and handles the error returned by the next handler
@@ -155,20 +129,20 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) error {
 		if err := next(c); err != nil {
 			if err == ErrUserNotFound {
-				return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage)
+				return c.Send(locale.Get(c.Sender().LanguageCode).StartMessage)
 			}
 			if err == fibapi.ErrAuthorizationExpired {
 				log.Infof("user %d authorization has expired", c.Sender().ID)
 				if e := db.DelUser(c.Sender().ID); e != nil {
 					log.Errorf("failed to delete user %d: %v", c.Sender().ID, e)
 				}
-				return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})
+				return c.Send(&ErrorMessage{locale.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})
 			}
 			if err != ErrInternal {
 				handlerName := runtime.FuncForPC(reflect.ValueOf(next).Pointer()).Name()
 				log.Errorf("error in handler %s: %v", handlerName, err)
 			}
-			return c.Send(&ErrorMessage{locales.Get(c.Sender().LanguageCode).InternalErrorMessage})
+			return c.Send(&ErrorMessage{locale.Get(c.Sender().LanguageCode).InternalErrorMessage})
 		}
 		return nil
 	}
@@ -217,9 +191,4 @@ func adminOnly(next tb.HandlerFunc) tb.HandlerFunc {
 		}
 		return next(c)
 	}
-}
-
-// fatalf is a wrapper for panic a formatted error
-func fatalf(f string, a ...any) {
-	panic(fmt.Errorf(f, a...))
 }

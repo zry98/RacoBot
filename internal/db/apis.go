@@ -2,7 +2,7 @@ package db
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -31,8 +31,9 @@ const (
 )
 
 const (
-	oauthStateLength              = 15                                    // no padding
-	OAuthStateBase64EncodedLength = ((4 * oauthStateLength / 3) + 3) & ^3 // for use in HTTP handler
+	oauthStateLength           = 15                   // no padding
+	OAuthStateHexEncodedLength = 2 * oauthStateLength // for use in HTTP handler check
+	//OAuthStateBase64EncodedLength = ((4 * oauthStateLength / 3) + 3) & ^3 // for use in HTTP handler check
 )
 
 // NewLoginSession creates a login session for a user with the given ID and language code
@@ -45,7 +46,7 @@ func NewLoginSession(userID int64, languageCode string) (s LoginSession, err err
 	}
 
 	s = LoginSession{
-		State:            base64.StdEncoding.EncodeToString(buf),
+		State:            hex.EncodeToString(buf),
 		UserID:           userID,
 		UserLanguageCode: languageCode,
 	}

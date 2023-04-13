@@ -1,4 +1,4 @@
-package jobs
+package job
 
 import (
 	"time"
@@ -32,8 +32,8 @@ func Init(config Config) {
 func Stop() {
 	if scheduler != nil {
 		scheduler.Stop()
-		log.Debug("jobs scheduler stopped")
 	}
+	log.Debug("jobs scheduler stopped")
 }
 
 // addJobs adds the jobs to the scheduler

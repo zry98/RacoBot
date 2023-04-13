@@ -28,11 +28,14 @@ const (
 )
 
 const (
+	OAuthAuthorizationCodeLength = 30
+
 	oauthInvalidAuthorizationCodeResponseErrorMessage = "invalid_grant"
 	resourceNotFoundResponseDetail                    = "Not found."
+	publicAPIClientIDHeader                           = "client_id"
+)
 
-	publicAPIClientIDHeader = "client_id"
-
+const (
 	tlsHandshakeTimeout = 5 * time.Second
 	httpClientTimeout   = 20 * time.Second
 	requestTimeout      = 10 * time.Second

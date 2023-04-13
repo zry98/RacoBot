@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
@@ -15,7 +14,7 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
-	"RacoBot/internal/jobs"
+	"RacoBot/internal/job"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -39,30 +38,33 @@ func cleanup() {
 		}
 		log.Debug("HTTP server shutdown")
 	}
-	jobs.Stop()
+	job.Stop()
 	bot.Stop()
 	db.Close()
 }
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
+	defer cleanup()
 	fibapi.Init(config.FIBAPI)
 	db.Init(config.Redis)
 	bot.Init(config.TelegramBot)
-	defer cleanup()
+	job.CacheSubjectCodes()
+	job.Init(config.JobsConfig)
 
-	jobs.CacheSubjectCodes()
-	jobs.Init(config.JobsConfig)
+	shutdown := make(chan struct{})
+	go func() { // graceful shutdown
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+		<-s
+		close(shutdown)
+		cleanup()
+		os.Exit(0)
+	}()
 
 	r := http.NewServeMux()
 	r.HandleFunc(config.FIBAPIOAuthRedirectPath, HandleOAuthRedirect) // FIB API OAuth redirect
-	if config.TelegramBotWebhookPath != "" {
-		r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate) // Telegram Bot update
+	if config.TelegramBotWebhookPath != "" {                          // Telegram Bot update by webhook
+		r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)
 	}
 
 	srv = &http.Server{
@@ -72,42 +74,25 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-
-	srvShutdown := make(chan struct{})
-	go func() { // graceful shutdown
-		s := make(chan os.Signal, 1)
-		signal.Notify(s, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-		<-s
-		cleanup()
-		close(srvShutdown)
-		os.Exit(0)
-	}()
-
+	if log.GetLevel() >= log.DebugLevel {
+		srv.ReadTimeout = 1 * time.Minute
+		srv.WriteTimeout = 1 * time.Minute
+	}
 	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with TLS
-		cert, e := tls.LoadX509KeyPair(config.TLS.CertificatePath, config.TLS.PrivateKeyPath)
-		if e != nil {
-			log.Errorf("failed to load TLS certificate: %v", e)
-			return
-		}
-
-		srv.TLSConfig = &tls.Config{
-			ServerName:   config.TLS.ServerName,
-			Certificates: []tls.Certificate{cert},
-		}
 		go func() {
 			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				log.Errorf("failed to start HTTP server: %v", err)
-				srvShutdown <- struct{}{}
+				shutdown <- struct{}{}
 			}
 		}()
 	} else { // without TLS
 		go func() {
 			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Errorf("failed to start HTTP server: %v", err)
-				srvShutdown <- struct{}{}
+				shutdown <- struct{}{}
 			}
 		}()
 	}
-	log.Debugf("HTTP server started listening on %s", srv.Addr)
-	<-srvShutdown
+	log.Debugf("started HTTP server listening on %s", srv.Addr)
+	<-shutdown
 }

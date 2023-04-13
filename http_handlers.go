@@ -7,11 +7,12 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
 	rl "RacoBot/internal/db/ratelimiters"
-	"RacoBot/internal/locales"
+	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -26,6 +27,7 @@ const (
 
 // HandleBotUpdate handles an incoming Telegram Bot Update request
 func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
+	defer fmt.Fprintln(w)
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -41,20 +43,21 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Errorf("failed to read request body: %v", err)
-		return
-	}
-	if len(body) == 0 { // getting an additional empty request after normal update when using Cloudflare proxy, weird
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, InternalErrorResponseBody)
 		return
 	}
 
-	var update bot.Update
+	var update tb.Update
 	if err = json.Unmarshal(body, &update); err != nil {
 		log.WithFields(log.Fields{
 			"IP": r.RemoteAddr,
 		}).Errorf("invalid update: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	// check if update is valid
 	var userID int64
 	if update.Message != nil {
 		userID = update.Message.Sender.ID
@@ -64,19 +67,21 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 		log.WithFields(log.Fields{
 			"IP": r.RemoteAddr,
 		}).Error("invalid update: no message or callback")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if userID == 0 {
 		log.WithFields(log.Fields{
 			"IP": r.RemoteAddr,
 		}).Error("invalid update: no sender UID")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
 	if !rl.BotUpdateAllowed(r.Context(), userID) {
 		log.WithFields(log.Fields{
 			"UID": userID,
 		}).Info("rate limited")
+		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
 
@@ -94,7 +99,8 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-	if code == "" || len(state) != db.OAuthStateBase64EncodedLength || r.Header.Get("referer") != fibapi.BaseURL {
+	if len(code) != fibapi.OAuthAuthorizationCodeLength || len(state) != db.OAuthStateHexEncodedLength ||
+		r.Header.Get("referer") != fibapi.BaseURL {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
 		return
@@ -174,8 +180,8 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("user %d logged in", loginSession.UserID)
 	greetingMessage := fmt.Sprintf("%s\n\n%s",
-		fmt.Sprintf(locales.Get(loginSession.UserLanguageCode).GreetingMessage, userInfo.FirstName),
-		locales.Get(loginSession.UserLanguageCode).HelpMessage)
+		fmt.Sprintf(locale.Get(loginSession.UserLanguageCode).GreetingMessage, userInfo.FirstName),
+		locale.Get(loginSession.UserLanguageCode).HelpMessage)
 	_ = bot.SendMessage(loginSession.UserID, greetingMessage)
 
 	// respond HTML with authorized message
@@ -194,9 +200,9 @@ func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() { // returns an HTTP 500 response if the next handler got panicked
 			if err := recover(); err != nil {
-				log.Errorf("error recovered in request \"%s %s\": %v", r.Method, r.URL.Path, err)
+				log.Errorf(`error recovered in request "%s %s": %v`, r.Method, r.URL.Path, err)
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintln(w, InternalErrorResponseBody)
+				_, _ = fmt.Fprintln(w, InternalErrorResponseBody)
 				return
 			}
 		}()

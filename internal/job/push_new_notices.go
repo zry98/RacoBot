@@ -1,4 +1,4 @@
-package jobs
+package job
 
 import (
 	"strings"
@@ -9,14 +9,19 @@ import (
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
-	"RacoBot/internal/locales"
+	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
 
 // PushNewNotices checks and pushes new notices for all users
-// TODO: use goroutine to send messages concurrently? (no, it's not worth it, FIB API server has poor concurrency, better reuse connection)
+// NOTE: not using goroutine to do it concurrently because it's not worth it, FIB API server has poor concurrency, better reuse connection
 func PushNewNotices() {
 	logger := log.WithField("job", "PushNewNotices")
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Errorf("panic recovered: %v", r)
+		}
+	}()
 
 	userIDs, err := db.GetAllUserIDs()
 	if err != nil {
@@ -36,7 +41,7 @@ func PushNewNotices() {
 			userLogger.Error("failed to create client")
 			// try sending a message to the user to ask them to re-login to fix it
 			_ = bot.SendMessage(userID, &bot.ErrorMessage{
-				Text: locales.Get("default").FIBAPIAuthorizationExpiredMessage,
+				Text: locale.Get("default").FIBAPIAuthorizationExpiredMessage,
 			})
 			if err = db.DelUser(userID); err != nil {
 				logger.Errorf("failed to delete user %d: %v", userID, err)
@@ -51,7 +56,7 @@ func PushNewNotices() {
 			if err == fibapi.ErrAuthorizationExpired {
 				// notify the user that their FIB API authorization has expired
 				if bot.SendMessage(userID, &bot.ErrorMessage{
-					Text: locales.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage,
+					Text: locale.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage,
 				}) != nil {
 					// delete them from DB if the notification was sent successfully
 					if err = db.DelUser(userID); err != nil {
@@ -70,7 +75,7 @@ func PushNewNotices() {
 		var userSentCount uint32
 		for _, n := range newNotices {
 			var sendOptions []interface{}
-			// // disable notification for banner notices if the user has muted them
+			// disable notification for banner notices if the user has opted to mute them
 			if strings.HasPrefix(n.SubjectCode, "#") && n.User.MuteBannerNotices {
 				sendOptions = append(sendOptions, tb.Silent)
 			}
@@ -81,7 +86,6 @@ func PushNewNotices() {
 		}
 		userLogger.Infof("sent %d/%d new notices", userSentCount, len(newNotices))
 	}
-
 	logger.Infof("checked %d/%d users and sent %d/%d new notices in %s",
 		checkedUserCount, len(userIDs),
 		totalSentCount, totalFetchedCount,

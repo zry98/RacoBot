@@ -12,7 +12,7 @@ import (
 	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
-	"RacoBot/internal/locales"
+	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -24,7 +24,7 @@ type LoginLinkMessage struct {
 // Send formats a LoginLinkMessage to a proper string with a generated Authorization URL and sends it
 func (m *LoginLinkMessage) Send(b *tb.Bot, to tb.Recipient, opt *tb.SendOptions) (*tb.Message, error) {
 	authorizationURL := fibapi.NewAuthorizationURL(m.State)
-	text := fmt.Sprintf(locales.Get(m.UserLanguageCode).LoginLinkMessage, authorizationURL)
+	text := fmt.Sprintf(locale.Get(m.UserLanguageCode).LoginLinkMessage, authorizationURL)
 	return b.Send(to, text, tb.NoPreview)
 }
 
@@ -226,7 +226,7 @@ var (
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
 func (m *NoticeMessage) String() string {
-	locale := locales.Get(m.User.LanguageCode)
+	locale := locale.Get(m.User.LanguageCode)
 	var sb strings.Builder
 
 	// message header (subject, title, publish time, original link)

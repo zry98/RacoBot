@@ -45,14 +45,15 @@ func Init(config Config) {
 
 	RateLimiter = redis_rate.NewLimiter(rdb)
 
-	log.Debug("DB client initialized")
+	log.Debug("DB connected")
 }
 
-// Close closes the DB client
+// Close closes the DB
 func Close() {
-	if err := rdb.Close(); err != nil {
-		log.Errorf("failed to close DB client: %v", err)
-	} else {
-		log.Debug("DB client closed")
+	if rdb != nil {
+		if err := rdb.Close(); err != nil {
+			log.Errorf("failed to close DB: %v", err)
+		}
 	}
+	log.Debug("DB closed")
 }

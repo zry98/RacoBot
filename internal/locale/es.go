@@ -1,10 +1,10 @@
-package locales
+package locale
 
 import tb "gopkg.in/telebot.v3"
 
 var es = Locale{
 	StartMessage:                        "Por favor, /login para autorizar Racó Bot.",
-	LoginLinkMessage:                    "<a href=\"%s\">Autorizar Racó Bot con UPC SSO.</a>",
+	LoginLinkMessage:                    `<a href="%s">Autorizar Racó Bot con UPC SSO.</a>`,
 	GreetingMessage:                     "¡Hola, %s!",
 	HelpMessage:                         "Puedes usar:\n/test para obtener una vista previa del último aviso.\n/logout para dejar de recibir mensajes y revocar la autorización en el servidor.\n\nPara informes de bugs (avisos con texto mal formado, falta de avisos, error en las traducciones, ...), solicitudes de funciones o cualquier otra consulta, utiliza <i><a href=\"https://github.com/zry98/RacoBot/issues\">GitHub Issues</a></i>, ¡gracias!",
 	AlreadyLoggedInMessage:              "Ya has iniciado la sesión, comprueba /whoami; o /logout para revocar la autorización.",
@@ -15,7 +15,7 @@ var es = Locale{
 	NoticeMessageAttachmentNounPlural:   "adjuntos",
 	NoticeMessageAttachmentListHeader:   "<i>📎 Con %d %s:</i>",
 	DecimalSeparator:                    ',',
-	NoticeMessageTooLongErrorMessage:    "🤖 Lo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href=\"%s\">este enlace</a>.",
+	NoticeMessageTooLongErrorMessage:    `🤖 Lo siento, pero este mensaje es demasiado largo para enviarlo por Telegram, por favor véalo a través de <a href="%s">este enlace</a>.`,
 	NoticeUnavailableErrorMessage:       "<i>Aviso no disponible.</i>",
 	NoAvailableNoticesErrorMessage:      "<i>No hay avisos disponibles.</i>",
 	InternalErrorMessage:                "<i>Se ha producido un error interno.</i>",

@@ -10,23 +10,23 @@ import (
 
 	"RacoBot/internal/db"
 	rl "RacoBot/internal/db/ratelimiters"
-	"RacoBot/internal/locales"
+	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
 
 // start replies with a `/login` message
 // on command `/start`
 func start(c tb.Context) error {
-	return c.Send(locales.Get(c.Sender().LanguageCode).StartMessage)
+	return c.Send(locale.Get(c.Sender().LanguageCode).StartMessage)
 }
 
 // help replies with a help message
 // on command `/help`
 func help(c tb.Context) error {
 	if client := NewClient(c.Sender().ID); client != nil {
-		return c.Send(locales.Get(client.User.LanguageCode).HelpMessage, tb.NoPreview)
+		return c.Send(locale.Get(client.User.LanguageCode).HelpMessage, tb.NoPreview)
 	} else {
-		return c.Send(locales.Get(c.Sender().LanguageCode).HelpMessage, tb.NoPreview)
+		return c.Send(locale.Get(c.Sender().LanguageCode).HelpMessage, tb.NoPreview)
 	}
 }
 
@@ -47,7 +47,7 @@ func login(c tb.Context) error {
 	}
 	if err == nil && user.AccessToken != "" && user.RefreshToken != "" {
 		// already logged-in user
-		return c.Send(locales.Get(user.LanguageCode).AlreadyLoggedInMessage)
+		return c.Send(locale.Get(user.LanguageCode).AlreadyLoggedInMessage)
 	}
 
 	// new user
@@ -97,9 +97,9 @@ func logout(c tb.Context) error {
 			return err
 		}
 		log.Errorf("failed to logout user %d: %v", c.Sender().ID, err)
-		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).LogoutFailedMessage})
+		return c.Send(&ErrorMessage{locale.Get(client.User.LanguageCode).LogoutFailedMessage})
 	}
-	return c.Send(locales.Get(client.User.LanguageCode).LogoutSucceededMessage)
+	return c.Send(locale.Get(client.User.LanguageCode).LogoutSucceededMessage)
 }
 
 // debug replies with a notice with the given ID in payload
@@ -122,7 +122,7 @@ func debug(c tb.Context) error {
 	notice, err := client.GetNotice(int32(noticeID))
 	if err == fibapi.ErrNoticeNotFound || (err == nil && notice.ID == 0) {
 		// notice doesn't exist or isn't available to the user
-		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
+		return c.Send(&ErrorMessage{locale.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
 	}
 	if err != nil {
 		log.Errorf("failed to get notice %d: %v", noticeID, err)
@@ -157,7 +157,7 @@ func test(c tb.Context) error {
 	}()
 
 	if len(notices) == 0 {
-		return c.Send(&ErrorMessage{locales.Get(client.User.LanguageCode).NoAvailableNoticesErrorMessage})
+		return c.Send(&ErrorMessage{locale.Get(client.User.LanguageCode).NoAvailableNoticesErrorMessage})
 	}
 	latestNotice := notices[len(notices)-1]
 	return c.Send(&NoticeMessage{latestNotice, client.User, getNoticeLinkURL(latestNotice)})
@@ -177,20 +177,20 @@ func setPreferredLanguage(c tb.Context) error {
 
 	// on command `/lang`, show the menu for selecting language
 	if c.Callback() == nil {
-		return c.Reply(locales.Get(user.LanguageCode).SelectPreferredLanguageMenuText, setLanguageMenu)
+		return c.Reply(locale.Get(user.LanguageCode).SelectPreferredLanguageMenuText, setLanguageMenu)
 	}
 
 	// on callbacks, set the user's preferred language with the given button data
 	langCode := c.Callback().Unique
 	if langCode == "" || (langCode != "en" && langCode != "es" && langCode != "ca") {
-		return c.Reply(&ErrorMessage{locales.Get(c.Sender().LanguageCode).LanguageUnavailableErrorMessage})
+		return c.Reply(&ErrorMessage{locale.Get(c.Sender().LanguageCode).LanguageUnavailableErrorMessage})
 	}
 	user.LanguageCode = langCode
 	if e := db.PutUser(user); e != nil {
 		log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
 		return ErrInternal
 	}
-	return c.Edit(locales.Get(langCode).PreferredLanguageSetMessage)
+	return c.Edit(locale.Get(langCode).PreferredLanguageSetMessage)
 }
 
 // publishAnnouncement publishes and pins the given announcement to all users in database
