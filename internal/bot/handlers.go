@@ -186,8 +186,8 @@ func setPreferredLanguage(c tb.Context) error {
 		return c.Reply(&ErrorMessage{locale.Get(c.Sender().LanguageCode).LanguageUnavailableErrorMessage})
 	}
 	user.LanguageCode = langCode
-	if e := db.PutUser(user); e != nil {
-		log.Errorf("failed to put user %d: %v", c.Sender().ID, e)
+	if err = db.PutUser(user); err != nil {
+		log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
 		return ErrInternal
 	}
 	return c.Edit(locale.Get(langCode).PreferredLanguageSetMessage)
@@ -224,4 +224,29 @@ func publishAnnouncement(c tb.Context) error {
 	}(m)
 
 	return c.Send("Started publishing announcement")
+}
+
+// toggleMuteBannerNotices toggles the user's mute state for banner notices
+// on command `/mute_banner_notices` or `/unmute_banner_notices`
+func toggleMuteBannerNotices(c tb.Context) error {
+	user, err := db.GetUser(c.Sender().ID)
+	if err != nil {
+		if err == db.ErrUserNotFound {
+			return ErrUserNotFound
+		}
+		log.Errorf("failed to get user %d: %v", c.Sender().ID, err)
+		return ErrInternal
+	}
+
+	user.MuteBannerNotices = !user.MuteBannerNotices
+	if err = db.PutUser(user); err != nil {
+		log.Errorf("failed to put user %d: %v", c.Sender().ID, err)
+		return ErrInternal
+	}
+
+	if user.MuteBannerNotices {
+		return c.Send(locale.Get(user.LanguageCode).BannerNoticesMutedMessage)
+	} else {
+		return c.Send(locale.Get(user.LanguageCode).BannerNoticesUnmutedMessage)
+	}
 }

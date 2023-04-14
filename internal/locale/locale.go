@@ -24,6 +24,8 @@ type Locale struct {
 	SelectPreferredLanguageMenuText     string
 	LanguageUnavailableErrorMessage     string
 	PreferredLanguageSetMessage         string
+	BannerNoticesMutedMessage           string
+	BannerNoticesUnmutedMessage         string
 	//Authorized                          string
 	//AuthorizedResponseMessage           string
 	CommandsMenu []tb.Command

@@ -74,12 +74,14 @@ func PushNewNotices() {
 		totalFetchedCount += uint32(len(newNotices))
 		var userSentCount uint32
 		for _, n := range newNotices {
-			var sendOptions []interface{}
-			// disable notification for banner notices if the user has opted to mute them
+			var msg *tb.Message
+			// disable notification for banner notices (with subject code starts with `#`) if the user has opted to mute them
 			if strings.HasPrefix(n.SubjectCode, "#") && n.User.MuteBannerNotices {
-				sendOptions = append(sendOptions, tb.Silent)
+				msg = bot.SendMessage(userID, &n, tb.Silent)
+			} else {
+				msg = bot.SendMessage(userID, &n)
 			}
-			if bot.SendMessage(userID, &n, sendOptions) != nil {
+			if msg != nil {
 				userSentCount++
 				totalSentCount++
 			}
