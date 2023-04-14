@@ -227,7 +227,7 @@ func publishAnnouncement(c tb.Context) error {
 }
 
 // toggleMuteBannerNotices toggles the user's mute state for banner notices
-// on command `/mute_banner_notices` or `/unmute_banner_notices`
+// on command `/toggle_mute_banner_notices`
 func toggleMuteBannerNotices(c tb.Context) error {
 	user, err := db.GetUser(c.Sender().ID)
 	if err != nil {

@@ -61,13 +61,12 @@ func Init(config Config) {
 	b.Handle("/help", help)
 	b.Handle("/login", login)
 	b.Handle("/lang", setPreferredLanguage)
+	b.Handle("/toggle_mute_banner_notices", toggleMuteBannerNotices)
 	b.Handle("/whoami", whoami)
 	b.Handle("/test", test)
 	b.Handle("/logout", logout)
 	b.Handle("/debug", debug)
 	b.Handle("/announce", publishAnnouncement, adminOnly)
-	b.Handle("/mute_banner_notices", toggleMuteBannerNotices)
-	b.Handle("/unmute_banner_notices", toggleMuteBannerNotices)
 
 	// initialize the menu for selecting preferred language
 	setLanguageMenu.Inline(setLanguageMenu.Row(setLanguageButtonCA, setLanguageButtonES, setLanguageButtonEN))
