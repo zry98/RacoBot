@@ -30,6 +30,7 @@ type Config struct {
 
 	TelegramBotWebhookPath  string
 	FIBAPIOAuthRedirectPath string
+	MailtoLinkRedirectPath  string
 }
 
 // LogConfig represents a configuration for the global logger
@@ -86,6 +87,7 @@ type TLSConfig struct {
 	ServerName      string `toml:"server_name,omitempty"`
 	CertificatePath string `toml:"certificate_path,omitempty"`
 	PrivateKeyPath  string `toml:"private_key_path,omitempty"`
+	Certificates    []tls.Certificate
 }
 
 // setupHTTPServer sets up the HTTP server configuration
@@ -98,26 +100,23 @@ func (c *Config) setupHTTPServer() error {
 	}
 
 	if err := c.setupRoutingPaths(); err != nil {
-		return fmt.Errorf("failed to setup routing paths: %v", err)
+		return fmt.Errorf("failed to setup routing paths: %w", err)
 	}
 
-	if c.TLS.ServerName != "" { // TLS is enabled
-		u, err := url.Parse(c.TLS.ServerName)
-		if err != nil {
-			return fmt.Errorf("failed to parse TLS server name: %v", err)
-		}
-
-		if c.TLS.CertificatePath != "" && c.TLS.PrivateKeyPath != "" {
-			cert, err := tls.LoadX509KeyPair(c.TLS.CertificatePath, c.TLS.PrivateKeyPath)
+	if c.TLS.CertificatePath != "" && c.TLS.PrivateKeyPath != "" { // TLS is enabled
+		if c.TLS.ServerName == "" {
+			u, err := url.Parse(c.FIBAPI.OAuthRedirectURI)
 			if err != nil {
-				return fmt.Errorf("failed to load TLS certificate: %v", err)
+				return fmt.Errorf("failed to parse FIB API OAuth redirect URI: %w", err)
 			}
-
-			srv.TLSConfig = &tls.Config{
-				ServerName:   u.Hostname(),
-				Certificates: []tls.Certificate{cert},
-			}
+			c.TLS.ServerName = u.Hostname()
 		}
+
+		cert, err := tls.LoadX509KeyPair(c.TLS.CertificatePath, c.TLS.PrivateKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to load TLS certificate: %w", err)
+		}
+		c.TLS.Certificates = []tls.Certificate{cert}
 	}
 	return nil
 }
@@ -127,7 +126,7 @@ func (c *Config) setupRoutingPaths() error {
 	if c.TelegramBot.WebhookURL != "" {
 		u, err := url.Parse(c.TelegramBot.WebhookURL)
 		if err != nil {
-			return fmt.Errorf("invalid Telegram bot webhook URL: %v", err)
+			return fmt.Errorf("invalid Telegram bot webhook URL: %w", err)
 		}
 		c.TelegramBotWebhookPath = u.Path
 	}
@@ -137,8 +136,24 @@ func (c *Config) setupRoutingPaths() error {
 	}
 	u, err := url.Parse(c.FIBAPI.OAuthRedirectURI)
 	if err != nil {
-		return fmt.Errorf("invalid FIB API OAuth redirect URI: %v", err)
+		return fmt.Errorf("invalid FIB API OAuth redirect URI: %w", err)
 	}
 	c.FIBAPIOAuthRedirectPath = u.Path
+
+	if c.TelegramBot.MailtoLinkRedirectURL == "" {
+		c.TelegramBot.MailtoLinkRedirectURL = fmt.Sprintf("%s://%s/mailto", u.Scheme, u.Host)
+	}
+	u2, err := url.Parse(c.TelegramBot.MailtoLinkRedirectURL)
+	if err != nil {
+		return fmt.Errorf("invalid mailto link redirect URL: %w", err)
+	}
+	if u2.RawQuery != "" {
+		c.TelegramBot.MailtoLinkRedirectURL += "&"
+	} else {
+		c.TelegramBot.MailtoLinkRedirectURL += "?"
+	}
+	if u.Host == u2.Host { // same host, enable handling mailto link redirects on this server
+		c.MailtoLinkRedirectPath = u2.Path
+	}
 	return nil
 }

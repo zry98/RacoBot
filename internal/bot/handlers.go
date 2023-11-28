@@ -9,7 +9,7 @@ import (
 	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/db"
-	rl "RacoBot/internal/db/ratelimiters"
+	rl "RacoBot/internal/db/ratelimiter"
 	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )

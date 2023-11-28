@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
@@ -66,6 +67,9 @@ func main() {
 	if config.TelegramBotWebhookPath != "" {                          // Telegram Bot update by webhook
 		r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)
 	}
+	if config.MailtoLinkRedirectPath != "" { // mailto link redirect
+		r.HandleFunc(config.MailtoLinkRedirectPath, HandleMailtoLinkRedirect)
+	}
 
 	srv = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.Host, config.Port),
@@ -78,7 +82,11 @@ func main() {
 		srv.ReadTimeout = 1 * time.Minute
 		srv.WriteTimeout = 1 * time.Minute
 	}
-	if config.TLS.CertificatePath != "" && config.TLS.PrivateKeyPath != "" { // with TLS
+	if len(config.TLS.Certificates) > 0 { // with TLS
+		srv.TLSConfig = &tls.Config{
+			ServerName:   config.TLS.ServerName,
+			Certificates: config.TLS.Certificates,
+		}
 		go func() {
 			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 				log.Errorf("failed to start HTTP server: %v", err)

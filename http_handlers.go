@@ -1,17 +1,19 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/telebot.v3"
 
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
-	rl "RacoBot/internal/db/ratelimiters"
+	rl "RacoBot/internal/db/ratelimiter"
 	"RacoBot/internal/locale"
 	"RacoBot/pkg/fibapi"
 )
@@ -193,6 +195,28 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	//	locales.Get(loginSession.UserLanguageCode).AuthorizedResponseMessage)
 	// TODO: check if 301 URI scheme redirect works well on all platforms
 	http.Redirect(w, r, "tg://resolve?domain="+bot.Username, http.StatusMovedPermanently)
+}
+
+// HandleMailtoLinkRedirect handles an incoming mailto: link redirect request
+func HandleMailtoLinkRedirect(w http.ResponseWriter, r *http.Request) {
+	defer fmt.Fprintln(w)
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	payload := r.URL.Query().Get("payload")
+	if payload == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	link, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil || !strings.HasPrefix(string(link), "mailto:") {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, string(link), http.StatusFound)
 }
 
 // middleware provides some useful middlewares for the server

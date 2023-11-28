@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	b                  *tb.Bot
-	useLongPoller      bool
-	adminUID           int64
-	WebhookSecretToken string
-	Username           string
+	b                     *tb.Bot
+	useLongPoller         bool
+	adminUID              int64
+	WebhookSecretToken    string
+	Username              string
+	MailtoLinkRedirectURL string
 )
 
 var (
@@ -36,10 +37,11 @@ func HandleUpdate(u tb.Update) {
 
 // Config represents a configuration for Telegram bot
 type Config struct {
-	AdminUID           int64  `toml:"admin_uid,omitempty"`
-	Token              string `toml:"token"`
-	WebhookURL         string `toml:"webhook_url,omitempty"`
-	WebhookSecretToken string `toml:"webhook_secret_token,omitempty"`
+	AdminUID              int64  `toml:"admin_uid,omitempty"`
+	Token                 string `toml:"token"`
+	WebhookURL            string `toml:"webhook_url,omitempty"`
+	WebhookSecretToken    string `toml:"webhook_secret_token,omitempty"`
+	MailtoLinkRedirectURL string `toml:"mailto_link_redirect_url,omitempty"`
 }
 
 // Init initializes the bot
@@ -104,9 +106,10 @@ func Init(config Config) {
 	if Username == "" {
 		log.Fatalf("failed to get bot username")
 	}
-
 	// save admin UID for later use in authorization middleware
 	adminUID = config.AdminUID
+
+	MailtoLinkRedirectURL = config.MailtoLinkRedirectURL
 
 	log.Debug("bot started")
 }

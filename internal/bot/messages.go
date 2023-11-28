@@ -1,8 +1,10 @@
 package bot
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -130,6 +132,25 @@ var (
 				},
 			},
 			{
+				// replace mailto: link with a redirect link, since Telegram clients don't support them in <a> tags
+				Selector: `a[href^="mailto:"]`,
+				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
+					href, err := e.AttributeValue("href")
+					if err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					params := url.Values{
+						"payload": {base64.StdEncoding.EncodeToString([]byte(href))},
+					}.Encode()
+					if err = e.SetAttribute("href", MailtoLinkRedirectURL+params); err != nil {
+						log.Error(err)
+						return hr.Stop
+					}
+					return hr.Continue
+				},
+			},
+			{
 				// Telegram doesn't support `<br>` but `\n`
 				Selector: `br`,
 				ElementHandler: func(e *hr.Element) hr.RewriterDirective {
@@ -226,7 +247,7 @@ var (
 
 // String formats a NoticeMessage to a proper string ready to be sent by bot
 func (m *NoticeMessage) String() string {
-	locale := locale.Get(m.User.LanguageCode)
+	l := locale.Get(m.User.LanguageCode)
 	var sb strings.Builder
 
 	// message header (subject, title, publish time, original link)
@@ -234,7 +255,7 @@ func (m *NoticeMessage) String() string {
 		strings.ReplaceAll(strings.TrimPrefix(m.SubjectCode, "#"), "-", "_"), // telegram tags can't contain dashes
 		m.Title,
 		m.PublishedAt.Format(datetimeLayout),
-		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, locale.NoticeMessageOriginalLinkText))
+		fmt.Sprintf("<a href=\"%s\">%s</a>", m.linkURL, l.NoticeMessageOriginalLinkText))
 	sb.WriteString(header)
 
 	// format body text
@@ -242,7 +263,7 @@ func (m *NoticeMessage) String() string {
 		text, err := hr.RewriteString(m.Text, &htmlRewriterHandlers)
 		if err != nil {
 			log.Errorf("error rewriting notice message text HTML: %v", err)
-			return fmt.Sprintf("%s\n\n%s", header, locale.InternalErrorMessage)
+			return fmt.Sprintf("%s\n\n%s", header, l.InternalErrorMessage)
 		}
 
 		// unescape HTML entities except `&lt;`, `&gt;`, `&amp;` and `&quot;`
@@ -259,9 +280,9 @@ func (m *NoticeMessage) String() string {
 
 	// append attachments if there are any
 	if len(m.Attachments) != 0 {
-		noun := locale.NoticeMessageAttachmentNounSingular
+		noun := l.NoticeMessageAttachmentNounSingular
 		if len(m.Attachments) > 1 {
-			noun = locale.NoticeMessageAttachmentNounPlural
+			noun = l.NoticeMessageAttachmentNounPlural
 			// sort attachments by filename
 			sort.Slice(m.Attachments, func(i, j int) bool {
 				return m.Attachments[i].Name < m.Attachments[j].Name
@@ -269,12 +290,12 @@ func (m *NoticeMessage) String() string {
 		}
 
 		var sbAttachments strings.Builder
-		for _, attachment := range m.Attachments {
-			fileSize := strings.ReplaceAll(byteCountIEC(attachment.Size), ".", string(locale.DecimalSeparator))
-			fmt.Fprintf(&sbAttachments, "<a href=\"%s\">%s</a>  (%s)\n", attachment.RedirectURL, attachment.Name, fileSize)
+		for _, a := range m.Attachments {
+			fileSize := strings.ReplaceAll(byteCountIEC(a.Size), ".", string(l.DecimalSeparator))
+			fmt.Fprintf(&sbAttachments, "<a href=\"%s\">%s</a>  (%s)\n", a.RedirectURL, a.Name, fileSize)
 		}
 		fmt.Fprintf(&sb, "\n\n%s\n%s",
-			fmt.Sprintf(locale.NoticeMessageAttachmentListHeader, len(m.Attachments), noun),
+			fmt.Sprintf(l.NoticeMessageAttachmentListHeader, len(m.Attachments), noun),
 			strings.TrimSuffix(sbAttachments.String(), "\n"))
 	}
 
@@ -282,7 +303,7 @@ func (m *NoticeMessage) String() string {
 	if sb.Len() > messageMaxLength {
 		return fmt.Sprintf("%s\n\n%s",
 			header,
-			fmt.Sprintf(locale.NoticeMessageTooLongErrorMessage, m.linkURL))
+			fmt.Sprintf(l.NoticeMessageTooLongErrorMessage, m.linkURL))
 	}
 	return sb.String()
 }
