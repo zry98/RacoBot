@@ -102,7 +102,7 @@ type SubjectsResponse struct {
 
 // Subject represents a single subject in a SubjectsResponse API response
 type Subject struct {
-	UPCCode  uint32  `json:"codi_upc"` // FIXME: signed?
+	UPCCode  uint32  `json:"codi_upc,string"` // FIXME: signed?
 	Credits  float32 `json:"credits"`
 	ID       string  `json:"id"`
 	Name     string  `json:"nom"`
@@ -146,7 +146,7 @@ func (t Time) MarshalJSON() ([]byte, error) {
 // PublicSubject represents a PublicSubject's API response, or a single subject in a PublicSubjectsResponse
 // Endpoint: /assignatures/{acronym}.json
 type PublicSubject struct {
-	UPCCode      uint32              `json:"codi_upc"`
+	UPCCode      uint32              `json:"codi_upc,string"`
 	Credits      float32             `json:"credits"`
 	ID           string              `json:"id"`
 	Name         string              `json:"nom"`

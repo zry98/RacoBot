@@ -28,8 +28,9 @@ var (
 
 	// HTTP request headers to send
 	requestHeaders = map[string]string{
-		"Accept":     "application/json",
-		"User-Agent": "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
+		"Accept":          "application/json",
+		"Accept-Language": "es-ES",
+		"User-Agent":      "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
 	}
 )
 
