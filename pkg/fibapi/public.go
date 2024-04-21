@@ -97,22 +97,22 @@ func requestPublic(method, URL string) ([]byte, http.Header, error) {
 		// API error handling
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
 			// token has expired or has been revoked on server
-			return nil, nil, ErrAuthorizationExpired
+			return body, resp.Header, ErrAuthorizationExpired
 		} else if resp.StatusCode == http.StatusNotFound {
 			var r Response
 			if err = json.Unmarshal(body, &r); err != nil {
-				return nil, nil, fmt.Errorf("fibapi: error parsing response: %w", err)
+				return body, resp.Header, fmt.Errorf("fibapi: error parsing response: %w", err)
 			}
 			if r.Detail == resourceNotFoundResponseDetail {
-				return nil, nil, ErrResourceNotFound
+				return body, resp.Header, ErrResourceNotFound
 			} else {
 				if r.Detail == "" {
 					r.Detail = "(no detail message)"
 				}
-				return nil, nil, fmt.Errorf("fibapi: error in response: %s", r.Detail)
+				return body, resp.Header, fmt.Errorf("fibapi: error in response: %s", r.Detail)
 			}
 		} else {
-			return nil, nil, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
+			return body, resp.Header, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
 		}
 	}
 

@@ -157,7 +157,6 @@ func (c *PrivateClient) request(method, URL string) ([]byte, http.Header, error)
 		if rErr, ok := err.(*url.Error).Err.(*oauth2.RetrieveError); ok { // API error, pass it to later handling
 			resp = rErr.Response
 			body = rErr.Body
-			err = nil
 		} else {
 			return nil, nil, fmt.Errorf("fibapi: error making request: %w", err)
 		}
@@ -173,9 +172,9 @@ func (c *PrivateClient) request(method, URL string) ([]byte, http.Header, error)
 		// API error handling
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
 			// token has expired or has been revoked on server
-			return nil, nil, ErrAuthorizationExpired
+			return body, resp.Header, ErrAuthorizationExpired
 		} else {
-			return nil, nil, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
+			return body, resp.Header, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
 		}
 	}
 
