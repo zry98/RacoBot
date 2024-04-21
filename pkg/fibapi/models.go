@@ -167,7 +167,7 @@ type PublicSubject struct {
 }
 
 // PublicSubjectsResponse represents a public subjects API response
-// // Endpoint: /jo/assignatures.json
+// Endpoint: /jo/assignatures.json
 type PublicSubjectsResponse struct {
 	Count       uint32          `json:"count"`
 	Year        string          `json:"curs,omitempty"`

@@ -14,6 +14,17 @@ import (
 	"golang.org/x/oauth2"
 )
 
+var (
+	oauthConf *oauth2.Config
+
+	// HTTP request headers to send
+	baseReqHeader = http.Header{
+		"Accept":          {"application/json"},
+		"Accept-Language": {"es-ES"},
+		"User-Agent":      {"RacoBot/1.0 (https://github.com/zry98/RacoBot)"},
+	}
+)
+
 // Config represents a configuration for FIB API OAuth application
 type Config struct {
 	OAuthClientID     string `toml:"oauth_client_id"`
@@ -23,17 +34,6 @@ type Config struct {
 	ClientUserAgent   string `toml:"client_user_agent,omitempty"`
 }
 
-var (
-	oauthConf *oauth2.Config
-
-	// HTTP request headers to send
-	requestHeaders = map[string]string{
-		"Accept":          "application/json",
-		"Accept-Language": "es-ES",
-		"User-Agent":      "RacoBot/1.0 (https://github.com/zry98/RacoBot)",
-	}
-)
-
 // Init initializes the FIB API clients
 func Init(config Config) {
 	u, err := url.Parse(BaseURL)
@@ -41,7 +41,7 @@ func Init(config Config) {
 		panic(err)
 	}
 	if config.ClientUserAgent != "" {
-		requestHeaders["User-Agent"] = config.ClientUserAgent
+		baseReqHeader.Set("User-Agent", config.ClientUserAgent)
 	}
 
 	// private API OAuth config
@@ -94,25 +94,24 @@ func NewAuthorizationURL(state string) string {
 }
 
 // Authorize tries to retrieve OAuth token with the given Authorization Code
-func Authorize(authorizationCode string) (token *oauth2.Token, userInfo UserInfo, err error) {
+func Authorize(authorizationCode string) (*oauth2.Token, UserInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	token, err = oauthConf.Exchange(ctx, authorizationCode)
+	token, err := oauthConf.Exchange(ctx, authorizationCode)
 	if err != nil {
-		err = ProcessTokenError(err)
-		return
+		return nil, UserInfo{}, ProcessTokenError(err)
 	}
 
 	// try to get UserInfo and check if the retrieved token is really valid
-	userInfo, err = NewClient(*token).GetUserInfo()
+	userInfo, err := NewClientFromToken(token).GetUserInfo()
 	if err != nil {
-		return
+		return nil, UserInfo{}, fmt.Errorf("fibapi: error getting user info: %w", err)
 	}
 	if userInfo.Username == "" {
-		err = ErrInvalidAuthorizationCode
+		return nil, UserInfo{}, ErrInvalidAuthorizationCode
 	}
-	return
+	return token, userInfo, err
 }
 
 // ProcessTokenError returns a more specific error from the given error

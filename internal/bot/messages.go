@@ -141,7 +141,7 @@ var (
 						return hr.Stop
 					}
 					params := url.Values{
-						"payload": {base64.StdEncoding.EncodeToString([]byte(href))},
+						"payload": {base64.URLEncoding.EncodeToString([]byte(href))},
 					}.Encode()
 					if err = e.SetAttribute("href", MailtoLinkRedirectURL+params); err != nil {
 						log.Error(err)

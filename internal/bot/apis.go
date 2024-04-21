@@ -31,7 +31,7 @@ var (
 func NewClient(userID int64) *Client {
 	user, err := db.GetUser(userID)
 	if err != nil {
-		if err != db.ErrUserNotFound {
+		if !errors.Is(err, db.ErrUserNotFound) {
 			log.Errorf("failed to get user %d: %v", userID, err)
 		}
 		return nil
@@ -41,12 +41,7 @@ func NewClient(userID int64) *Client {
 	}
 
 	return &Client{
-		*fibapi.NewClient(oauth2.Token{
-			AccessToken:  user.AccessToken,
-			RefreshToken: user.RefreshToken,
-			Expiry:       time.Unix(user.TokenExpiry, 0),
-			TokenType:    "Bearer",
-		}),
+		*fibapi.NewClient(user.AccessToken, user.RefreshToken, user.TokenExpiry),
 		user,
 	}
 }
@@ -57,7 +52,7 @@ func (c *Client) updateToken() {
 	newToken, err := c.PrivateClient.Transport.(*oauth2.Transport).Source.Token()
 	if err != nil {
 		err = fibapi.ProcessTokenError(err)
-		if err == fibapi.ErrInvalidAuthorizationCode {
+		if errors.Is(err, fibapi.ErrInvalidAuthorizationCode) {
 			log.Errorf("user %d authorization has expired", c.User.ID)
 			if e := db.DelUser(c.User.ID); e != nil {
 				log.Errorf("failed to delete user %d: %v", c.User.ID, e)
@@ -82,89 +77,82 @@ func (c *Client) updateToken() {
 }
 
 // GetFullName gets the user's full name (as format of `${firstName} ${lastName}`)
-func (c *Client) GetFullName() (fullName string, err error) {
+func (c *Client) GetFullName() (string, error) {
 	if c == nil {
-		err = ErrUserNotFound
-		return
+		return "", ErrUserNotFound
 	}
 	defer c.updateToken()
 
 	userInfo, err := c.PrivateClient.GetUserInfo()
 	if err != nil {
-		return
+		return "", err
 	}
-
-	fullName = fmt.Sprintf("%s %s", userInfo.FirstName, userInfo.LastNames)
-	return
+	return fmt.Sprintf("%s %s", userInfo.FirstName, userInfo.LastNames), nil
 }
 
 // GetNotices gets the user's notice messages
-func (c *Client) GetNotices() (messages []NoticeMessage, err error) {
+func (c *Client) GetNotices() ([]NoticeMessage, error) {
 	if c == nil {
-		err = ErrUserNotFound
-		return
+		return nil, ErrUserNotFound
 	}
 	defer c.updateToken()
 
 	notices, err := c.PrivateClient.GetNotices()
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	messages = make([]NoticeMessage, 0, len(notices))
+	msgs := make([]NoticeMessage, 0, len(notices))
 	for _, notice := range notices {
-		messages = append(messages, NoticeMessage{notice, c.User, getNoticeLinkURL(notice)})
+		msgs = append(msgs, NoticeMessage{notice, c.User, getNoticeLinkURL(notice)})
 	}
-	return
+	return msgs, nil
 }
 
 // GetNotice gets a specific notice message with the given ID
-func (c *Client) GetNotice(ID int32) (message NoticeMessage, err error) {
+func (c *Client) GetNotice(ID int32) (NoticeMessage, error) {
 	if c == nil {
-		err = ErrUserNotFound
-		return
+		return NoticeMessage{}, ErrUserNotFound
 	}
 	defer c.updateToken()
 
 	notice, err := c.PrivateClient.GetNotice(ID)
 	if err != nil {
-		return
+		return NoticeMessage{}, err
 	}
-
-	message = NoticeMessage{notice, c.User, getNoticeLinkURL(notice)}
-	return
+	return NoticeMessage{notice, c.User, getNoticeLinkURL(notice)}, nil
 }
 
 // GetNewNotices gets the user's new notice messages
-func (c *Client) GetNewNotices() (messages []NoticeMessage, err error) {
+func (c *Client) GetNewNotices() ([]NoticeMessage, error) {
 	if c == nil {
-		err = ErrUserNotFound
-		return
+		return nil, ErrUserNotFound
 	}
 	defer c.updateToken()
 
-	notices, err := c.PrivateClient.GetNoticesSince(c.User.LastNoticeTimestamp)
+	ns, err := c.PrivateClient.GetNoticesSince(c.User.LastNoticeTimestamp)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer func() { // save the last notice's timestamp to DB
-		if len(notices) > 0 {
-			c.User.LastNoticeTimestamp = notices[len(notices)-1].PublishedAt.Unix()
+		if len(ns) > 0 {
+			c.User.LastNoticeTimestamp = ns[len(ns)-1].PublishedAt.Unix()
 			if e := db.PutUser(c.User); e != nil {
 				log.Errorf("failed to put user %d: %v", c.User.ID, e)
 			}
 		}
 	}()
 
+	var msgs []NoticeMessage
 	if c.User.LastNoticeTimestamp != 0 { // if not a new user, send the new notices
-		messages = make([]NoticeMessage, 0, len(notices))
-		for _, n := range notices {
+		msgs = make([]NoticeMessage, 0, len(ns))
+		for _, n := range ns {
 			if n.PublishedAt.Unix() > c.User.LastNoticeTimestamp {
-				messages = append(messages, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
+				msgs = append(msgs, NoticeMessage{n, c.User, getNoticeLinkURL(n)})
 			}
 		}
 	}
-	return
+	return msgs, nil
 }
 
 // Logout revokes the user's OAuth token and deletes it from the database

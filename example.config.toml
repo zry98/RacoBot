@@ -23,7 +23,7 @@ public_client_id = ""
 token = ""
 webhook_url = "https://raco-bot.example.com/bot"
 #webhook_secret_token = ""
-admin_uid = 12345
+admin_uids = [12345]
 
 [jobs]
 # BE CAREFUL with the cron expressions

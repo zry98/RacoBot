@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -23,66 +24,76 @@ type PrivateClient struct {
 }
 
 // NewClient initializes a FIB API private client with the given OAuth token
-func NewClient(token oauth2.Token) *PrivateClient {
+func NewClient(accessToken string, refreshToken string, expiry int64) *PrivateClient {
+	token := oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Expiry:       time.Unix(expiry, 0),
+		TokenType:    "Bearer",
+	}
+	return NewClientFromToken(&token)
+}
+
+func NewClientFromToken(token *oauth2.Token) *PrivateClient {
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, privateClient)
-	ts := oauthConf.TokenSource(ctx, &token)
-	client := oauth2.NewClient(ctx, ts)
+	client := oauth2.NewClient(ctx, oauthConf.TokenSource(ctx, token))
 	return &PrivateClient{client, ctx}
 }
 
 // GetUserInfo gets the user's basic information (username, first name and last name only)
-func (c *PrivateClient) GetUserInfo() (userInfo UserInfo, err error) {
+func (c *PrivateClient) GetUserInfo() (UserInfo, error) {
 	body, _, err := c.request(http.MethodGet, userInfoURL)
 	if err != nil {
-		return
+		return UserInfo{}, err
 	}
+
+	var userInfo UserInfo
 	if err = json.Unmarshal(body, &userInfo); err != nil {
-		err = fmt.Errorf("fibapi: error parsing UserInfo: %w", err)
+		return UserInfo{}, fmt.Errorf("fibapi: error parsing UserInfo: %w", err)
 	}
-	return
+	return userInfo, nil
 }
 
 // GetNotices gets the user's notices
-func (c *PrivateClient) GetNotices() (notices []Notice, err error) {
+func (c *PrivateClient) GetNotices() ([]Notice, error) {
 	return c.GetNoticesSince(0)
 }
 
 // GetNoticesSince gets the user's notices published since the given timestamp
-func (c *PrivateClient) GetNoticesSince(timestamp int64) (notices []Notice, err error) {
+func (c *PrivateClient) GetNoticesSince(timestamp int64) ([]Notice, error) {
 	body, _, err := c.request(http.MethodGet, noticesURL)
 	if err != nil {
-		return
+		return nil, err
 	}
 	var resp NoticesResponse
 	if err = json.Unmarshal(body, &resp); err != nil {
-		err = fmt.Errorf("fibapi: error parsing Notices: %w", err)
-		return
+		return nil, fmt.Errorf("fibapi: error parsing Notices: %w", err)
 	}
 
-	notices = make([]Notice, 0, len(resp.Results))
+	ns := make([]Notice, 0, len(resp.Results))
 	for _, n := range resp.Results {
 		if n.PublishedAt.Unix() > timestamp {
-			notices = append(notices, n)
+			ns = append(ns, n)
 		}
 	}
-	sort.Slice(notices, func(i, j int) bool {
+	sort.Slice(ns, func(i, j int) bool {
 		// sort orders: PublishedAt, SubjectCode, Title
-		if notices[i].PublishedAt.Unix() == notices[j].PublishedAt.Unix() {
-			if notices[i].SubjectCode == notices[j].SubjectCode {
-				return notices[i].Title < notices[j].Title // in line with raco web
+		if ns[i].PublishedAt.Unix() == ns[j].PublishedAt.Unix() {
+			if ns[i].SubjectCode == ns[j].SubjectCode {
+				return ns[i].Title < ns[j].Title // in line with raco web
 			}
-			return notices[i].SubjectCode < notices[j].SubjectCode
+			return ns[i].SubjectCode < ns[j].SubjectCode
 		}
-		return notices[i].PublishedAt.Unix() < notices[j].PublishedAt.Unix()
+		return ns[i].PublishedAt.Unix() < ns[j].PublishedAt.Unix()
 	})
-	return
+	return ns, nil
 }
 
 // GetNotice gets a specific notice with the given ID
-func (c *PrivateClient) GetNotice(ID int32) (notice Notice, err error) {
+func (c *PrivateClient) GetNotice(ID int32) (Notice, error) {
 	notices, err := c.GetNotices()
 	if err != nil {
-		return
+		return Notice{}, err
 	}
 
 	for _, n := range notices {
@@ -90,8 +101,7 @@ func (c *PrivateClient) GetNotice(ID int32) (notice Notice, err error) {
 			return n, nil
 		}
 	}
-	err = ErrNoticeNotFound
-	return
+	return Notice{}, ErrNoticeNotFound
 }
 
 // GetSubjects gets the user's subjects
@@ -114,11 +124,10 @@ func (c *PrivateClient) RevokeToken() error {
 		return fmt.Errorf("fibapi: error extracting token: %w", err)
 	}
 
-	_, err = c.Client.PostForm(oauthRevokeURL, url.Values{
+	if _, err = c.Client.PostForm(oauthRevokeURL, url.Values{
 		"client_id": {oauthConf.ClientID},
 		"token":     {token.AccessToken},
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("fibapi: error revoking token: %w", err)
 	}
 	return nil
@@ -126,25 +135,23 @@ func (c *PrivateClient) RevokeToken() error {
 
 // GetAttachmentFile gets the given Attachment's bytes
 // BE CAREFUL: some attachments posted on racó are copyright-protected and should not be stored nor accessed by third-parties
-func (c *PrivateClient) GetAttachmentFile(a Attachment) (body []byte, err error) {
-	body, _, err = c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
-	return
+func (c *PrivateClient) GetAttachmentFile(a Attachment) ([]byte, error) {
+	body, _, err := c.request(http.MethodGet, strings.TrimSuffix(a.URL, `.json`))
+	return body, err
 }
 
 // request makes a request to Private FIB API using the given HTTP method and URL
-func (c *PrivateClient) request(method, URL string) (body []byte, header http.Header, err error) {
+func (c *PrivateClient) request(method, URL string) ([]byte, http.Header, error) {
 	ctx, cancel := context.WithTimeout(c.ctx, requestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, URL, nil)
 	if err != nil {
-		err = fmt.Errorf("fibapi: error creating request: %w", err)
-		return
+		return nil, nil, fmt.Errorf("fibapi: error creating request: %w", err)
 	}
-	for k, v := range requestHeaders {
-		req.Header.Set(k, v)
-	}
+	req.Header = baseReqHeader.Clone()
 
+	var body []byte
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		if rErr, ok := err.(*url.Error).Err.(*oauth2.RetrieveError); ok { // API error, pass it to later handling
@@ -152,15 +159,13 @@ func (c *PrivateClient) request(method, URL string) (body []byte, header http.He
 			body = rErr.Body
 			err = nil
 		} else {
-			err = fmt.Errorf("fibapi: error making request: %w", err)
-			return
+			return nil, nil, fmt.Errorf("fibapi: error making request: %w", err)
 		}
 	} else {
 		defer resp.Body.Close()
 		body, err = io.ReadAll(resp.Body)
 		if err != nil {
-			err = fmt.Errorf("fibapi: error reading response body: %w", err)
-			return
+			return nil, nil, fmt.Errorf("fibapi: error reading response body: %w", err)
 		}
 	}
 
@@ -168,12 +173,11 @@ func (c *PrivateClient) request(method, URL string) (body []byte, header http.He
 		// API error handling
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
 			// token has expired or has been revoked on server
-			err = ErrAuthorizationExpired
+			return nil, nil, ErrAuthorizationExpired
 		} else {
-			err = fmt.Errorf("fibapi: bad response (%d): %s", resp.StatusCode, string(body))
+			return nil, nil, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
 		}
 	}
 
-	header = resp.Header // return response header for future error handling
-	return
+	return body, resp.Header, nil // return with response header for future error handling
 }

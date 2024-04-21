@@ -2,11 +2,10 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redis_rate/v9"
+	"github.com/go-redis/redis_rate/v10"
+	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,9 +37,8 @@ func Init(config Config) {
 		Password: config.Password,
 		DB:       config.DB,
 	})
-	res, err := rdb.Ping(ctx).Result()
-	if err != nil || res != "PONG" {
-		panic(fmt.Errorf("failed to connect to DB: %v", err))
+	if res, err := rdb.Ping(ctx).Result(); err != nil || res != "PONG" {
+		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
 	RateLimiter = redis_rate.NewLimiter(rdb)

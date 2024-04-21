@@ -3,6 +3,7 @@ package bot
 import (
 	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
@@ -16,18 +17,10 @@ import (
 var (
 	b                     *tb.Bot
 	useLongPoller         bool
-	adminUID              int64
+	adminUIDs             []int64
 	WebhookSecretToken    string
 	Username              string
 	MailtoLinkRedirectURL string
-)
-
-var (
-	// menu keyboard for selecting preferred language
-	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
-	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
-	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
-	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
 )
 
 // HandleUpdate handles a Telegram bot update
@@ -37,12 +30,20 @@ func HandleUpdate(u tb.Update) {
 
 // Config represents a configuration for Telegram bot
 type Config struct {
-	AdminUID              int64  `toml:"admin_uid,omitempty"`
-	Token                 string `toml:"token"`
-	WebhookURL            string `toml:"webhook_url,omitempty"`
-	WebhookSecretToken    string `toml:"webhook_secret_token,omitempty"`
-	MailtoLinkRedirectURL string `toml:"mailto_link_redirect_url,omitempty"`
+	AdminUID              []int64 `toml:"admin_uids,omitempty"`
+	Token                 string  `toml:"token"`
+	WebhookURL            string  `toml:"webhook_url,omitempty"`
+	WebhookSecretToken    string  `toml:"webhook_secret_token,omitempty"`
+	MailtoLinkRedirectURL string  `toml:"mailto_link_redirect_url,omitempty"`
 }
+
+var (
+	// menu keyboard for selecting preferred language
+	setLanguageMenu     = &tb.ReplyMarkup{OneTimeKeyboard: true}
+	setLanguageButtonEN = setLanguageMenu.Data("English", "en")
+	setLanguageButtonES = setLanguageMenu.Data("Castellano", "es")
+	setLanguageButtonCA = setLanguageMenu.Data("Català", "ca")
+)
 
 // Init initializes the bot
 func Init(config Config) {
@@ -78,8 +79,8 @@ func Init(config Config) {
 
 	// set command menus
 	for _, languageCode := range locale.LanguageCodes {
-		if err = setCommands(locale.Get(languageCode).CommandsMenu, languageCode); err != nil {
-			log.Fatalf("failed to set commands menu for %s: %v", languageCode, err)
+		if err = b.SetCommands(locale.Get(languageCode).CommandsMenu, tb.CommandScopeDefault, languageCode); err != nil {
+			log.Errorf("failed to set commands menu for %s: %v", languageCode, err)
 		}
 	}
 
@@ -107,7 +108,7 @@ func Init(config Config) {
 		log.Fatalf("failed to get bot username")
 	}
 	// save admin UID for later use in authorization middleware
-	adminUID = config.AdminUID
+	adminUIDs = config.AdminUID
 
 	MailtoLinkRedirectURL = config.MailtoLinkRedirectURL
 
@@ -173,24 +174,10 @@ func DeleteLoginLinkMessage(s db.LoginSession) {
 	}
 }
 
-// setCommands changes the list of the bot's commands
-// FIXME: remove it when telebot implemented the language_code parameter
-func setCommands(cmds []tb.Command, langCode string) error {
-	params := struct {
-		Commands     []tb.Command `json:"commands"`
-		LanguageCode string       `json:"language_code"`
-	}{
-		cmds,
-		langCode,
-	}
-	_, err := b.Raw("setMyCommands", params)
-	return err
-}
-
-// adminOnly is a middleware that checks if the sender is admin
+// adminOnly is a middleware that checks if the sender is an admin
 func adminOnly(next tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) (err error) {
-		if c.Sender().ID != adminUID {
+		if !slices.Contains(adminUIDs, c.Sender().ID) {
 			return nil
 		}
 		return next(c)

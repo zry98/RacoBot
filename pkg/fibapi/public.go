@@ -57,69 +57,64 @@ func GetPublicSubjects() ([]PublicSubject, error) {
 }
 
 // GetPublicSubject gets a subject with the given acronym from the public API
-func GetPublicSubject(acronym string) (subject PublicSubject, err error) {
+func GetPublicSubject(acronym string) (PublicSubject, error) {
 	body, _, err := requestPublic(http.MethodGet, fmt.Sprintf(publicSubjectURLTemplate, acronym))
 	if err != nil {
-		return
+		return PublicSubject{}, err
 	}
+
+	var subject PublicSubject
 	if err = json.Unmarshal(body, &subject); err != nil {
-		err = fmt.Errorf("fibapi: error parsing PublicSubject: %w", err)
+		return PublicSubject{}, fmt.Errorf("fibapi: error parsing PublicSubject: %w", err)
 	}
-	return
+	return subject, nil
 }
 
 // requestPublic makes a request to Public FIB API using the given HTTP method and URL
-func requestPublic(method, URL string) (body []byte, header http.Header, err error) {
+func requestPublic(method, URL string) ([]byte, http.Header, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, method, URL, nil)
 	if err != nil {
-		err = fmt.Errorf("fibapi: error creating request: %w", err)
-		return
+		return nil, nil, fmt.Errorf("fibapi: error creating request: %w", err)
 	}
-	for k, v := range requestHeaders {
-		req.Header.Set(k, v)
-	}
+	req.Header = baseReqHeader.Clone()
 	req.Header.Set(publicAPIClientIDHeader, publicClientID)
 
 	resp, err := publicClient.Do(req)
 	if err != nil {
-		err = fmt.Errorf("fibapi: error making request: %w", err)
-		return
+		return nil, nil, fmt.Errorf("fibapi: error making request: %w", err)
 	}
 
 	defer resp.Body.Close()
-	body, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		err = fmt.Errorf("fibapi: error reading response body: %w", err)
-		return
+		return nil, nil, fmt.Errorf("fibapi: error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		// API error handling
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
 			// token has expired or has been revoked on server
-			err = ErrAuthorizationExpired
+			return nil, nil, ErrAuthorizationExpired
 		} else if resp.StatusCode == http.StatusNotFound {
 			var r Response
 			if err = json.Unmarshal(body, &r); err != nil {
-				err = fmt.Errorf("fibapi: error parsing response: %w", err)
-				return
+				return nil, nil, fmt.Errorf("fibapi: error parsing response: %w", err)
 			}
 			if r.Detail == resourceNotFoundResponseDetail {
-				err = ErrResourceNotFound
+				return nil, nil, ErrResourceNotFound
 			} else {
 				if r.Detail == "" {
 					r.Detail = "(no detail message)"
 				}
-				err = fmt.Errorf("fibapi: error in response: %s", r.Detail)
+				return nil, nil, fmt.Errorf("fibapi: error in response: %s", r.Detail)
 			}
 		} else {
-			err = fmt.Errorf("fibapi: bad response (%d): %s", resp.StatusCode, string(body))
+			return nil, nil, fmt.Errorf("fibapi: bad response (HTTP %d): %s", resp.StatusCode, string(body))
 		}
 	}
 
-	header = resp.Header
-	return
+	return body, resp.Header, nil
 }

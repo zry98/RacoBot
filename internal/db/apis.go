@@ -4,12 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // key names
@@ -37,37 +38,37 @@ const (
 )
 
 // NewLoginSession creates a login session for a user with the given ID and language code
-func NewLoginSession(userID int64, languageCode string) (s LoginSession, err error) {
+func NewLoginSession(userID int64, languageCode string) (LoginSession, error) {
 	// make a random string as state
 	buf := make([]byte, oauthStateLength)
-	_, err = rand.Read(buf)
-	if err != nil {
-		return
+	if _, err := rand.Read(buf); err != nil {
+		return LoginSession{}, err
 	}
 
-	s = LoginSession{
+	return LoginSession{
 		State:            hex.EncodeToString(buf),
 		UserID:           userID,
 		UserLanguageCode: languageCode,
-	}
-	return
+	}, nil
 }
 
 // GetLoginSession gets a login session with the given state
-func GetLoginSession(state string) (s LoginSession, err error) {
+func GetLoginSession(state string) (LoginSession, error) {
 	key := fmt.Sprintf("%s:%s", keyPrefixLoginSession, state)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			err = ErrLoginSessionNotFound
 		}
-		return
+		return LoginSession{}, err
 	}
+
+	var s LoginSession
 	if err = json.Unmarshal([]byte(value), &s); err != nil {
-		return
+		return LoginSession{}, err
 	}
 	s.State = state
-	return
+	return s, nil
 }
 
 // PutLoginSession puts the given login session
@@ -87,20 +88,22 @@ func DelLoginSession(state string) error {
 }
 
 // GetUser gets a user with the given ID
-func GetUser(userID int64) (user User, err error) {
+func GetUser(userID int64) (User, error) {
 	key := fmt.Sprintf("%s:%d", keyPrefixUser, userID)
 	value, err := rdb.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			err = ErrUserNotFound
 		}
-		return
+		return User{}, err
 	}
-	if err = json.Unmarshal([]byte(value), &user); err != nil {
-		return
+
+	var u User
+	if err = json.Unmarshal([]byte(value), &u); err != nil {
+		return User{}, err
 	}
-	user.ID = userID
-	return
+	u.ID = userID
+	return u, nil
 }
 
 // PutUser puts the given user
@@ -122,42 +125,41 @@ func DelUser(userID int64) error {
 
 // GetAllUserIDs gets all user IDs
 // TODO: get userIDs from a set?
-func GetAllUserIDs() (userIDs []int64, err error) {
+func GetAllUserIDs() ([]int64, error) {
 	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", keyPrefixUser)).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			err = nil
 		}
-		return
+		return nil, err
 	}
 
-	userIDs = make([]int64, 0, len(keys))
-	var userID int64
+	userIDs := make([]int64, 0, len(keys))
 	for _, key := range keys {
-		userID, err = strconv.ParseInt(strings.TrimPrefix(key, keyPrefixUser+":"), 10, 64)
+		ID, err := strconv.ParseInt(strings.TrimPrefix(key, keyPrefixUser+":"), 10, 64)
 		if err != nil {
-			return
+			return nil, err
 		}
-		userIDs = append(userIDs, userID)
+		userIDs = append(userIDs, ID)
 	}
-	return
+	return userIDs, nil
 }
 
 // GetSubjectUPCCode gets the UPC code of a subject with the given acronym
-func GetSubjectUPCCode(acronym string) (code uint32, err error) {
+func GetSubjectUPCCode(acronym string) (uint32, error) {
 	value, err := rdb.HGet(ctx, keySubjectCodes, acronym).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			err = ErrSubjectNotFound
 		}
-		return
+		return 0, err
 	}
+
 	i, err := strconv.ParseUint(value, 10, 32)
 	if err != nil {
-		return
+		return 0, err
 	}
-	code = uint32(i)
-	return
+	return uint32(i), nil
 }
 
 // PutSubjectUPCCode puts the given UPC code of a subject with the given acronym

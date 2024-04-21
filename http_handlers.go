@@ -157,22 +157,20 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.PutUser(db.User{
+	if err = db.PutUser(db.User{
 		ID:           loginSession.UserID,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		TokenExpiry:  token.Expiry.Unix() - 10*60, // expire it 10 minutes in advance
 		LanguageCode: loginSession.UserLanguageCode,
-	})
-	if err != nil {
+	}); err != nil {
 		log.Errorf("failed to put user %d: %v", loginSession.UserID, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, InternalErrorResponseBody)
 		return
 	}
 
-	err = db.DelLoginSession(state)
-	if err != nil {
+	if err = db.DelLoginSession(state); err != nil {
 		log.Errorf("failed to delete login session %s: %v", state, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, InternalErrorResponseBody)
@@ -210,7 +208,8 @@ func HandleMailtoLinkRedirect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	link, err := base64.StdEncoding.DecodeString(payload)
+
+	link, err := base64.URLEncoding.DecodeString(payload)
 	if err != nil || !strings.HasPrefix(string(link), "mailto:") {
 		w.WriteHeader(http.StatusBadRequest)
 		return
