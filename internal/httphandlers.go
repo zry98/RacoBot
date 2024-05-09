@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"encoding/base64"
@@ -101,8 +101,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-	if len(code) != fibapi.OAuthAuthorizationCodeLength || len(state) != db.OAuthStateHexEncodedLength ||
-		r.Header.Get("referer") != fibapi.BaseURL {
+	if len(code) != fibapi.OAuthAuthorizationCodeLength || len(state) != db.OAuthStateHexEncodedLength {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
 		return
@@ -218,8 +217,8 @@ func HandleMailtoLinkRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, string(link), http.StatusFound)
 }
 
-// middleware provides some useful middlewares for the server
-func middleware(next http.Handler) http.Handler {
+// Middleware provides some useful middlewares for the server
+func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() { // returns an HTTP 500 response if the next handler got panicked
 			if err := recover(); err != nil {

@@ -13,6 +13,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"RacoBot/internal"
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
 	"RacoBot/internal/job"
@@ -63,17 +64,17 @@ func main() {
 	}()
 
 	r := http.NewServeMux()
-	r.HandleFunc(config.FIBAPIOAuthRedirectPath, HandleOAuthRedirect) // FIB API OAuth redirect
-	if config.TelegramBotWebhookPath != "" {                          // Telegram Bot update by webhook
-		r.HandleFunc(config.TelegramBotWebhookPath, HandleBotUpdate)
+	r.HandleFunc(config.FIBAPIOAuthRedirectPath, internal.HandleOAuthRedirect) // FIB API OAuth redirect
+	if config.TelegramBotWebhookPath != "" {                                   // Telegram Bot update by webhook
+		r.HandleFunc(config.TelegramBotWebhookPath, internal.HandleBotUpdate)
 	}
 	if config.MailtoLinkRedirectPath != "" { // mailto link redirect
-		r.HandleFunc(config.MailtoLinkRedirectPath, HandleMailtoLinkRedirect)
+		r.HandleFunc(config.MailtoLinkRedirectPath, internal.HandleMailtoLinkRedirect)
 	}
 
 	srv = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.Host, config.Port),
-		Handler:      middleware(r),
+		Handler:      internal.Middleware(r),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
