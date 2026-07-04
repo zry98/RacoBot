@@ -43,7 +43,16 @@ func Init(config Config) {
 
 	RateLimiter = redis_rate.NewLimiter(rdb)
 
+	if err := reconcileUserIDIndex(); err != nil {
+		log.Errorf("failed to reconcile user IDs index: %v", err)
+	}
+
 	log.Debug("DB connected")
+}
+
+// Ping checks the connectivity to the DB
+func Ping(ctx context.Context) error {
+	return rdb.Ping(ctx).Err()
 }
 
 // Close closes the DB

@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"errors"
 	"reflect"
 	"runtime"
 	"slices"
@@ -59,7 +60,7 @@ func Init(config Config) {
 	}
 
 	// set handlers
-	b.Use(errorInterceptor)
+	b.Use(errorInterceptor, recoverMiddleware)
 	b.Handle("/start", start)
 	b.Handle("/help", help)
 	b.Handle("/login", login)
@@ -129,21 +130,35 @@ func Stop() {
 	log.Debug("bot stopped")
 }
 
+// recoverMiddleware recovers from panics in handlers so that a single panicking update can't crash the whole bot process (handlers run in their own goroutines).
+// The returned ErrInternal is handled by errorInterceptor, which replies to the user
+func recoverMiddleware(next tb.HandlerFunc) tb.HandlerFunc {
+	return func(c tb.Context) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("recovered from panic in bot handler (update %d): %v", c.Update().ID, r)
+				err = ErrInternal
+			}
+		}()
+		return next(c)
+	}
+}
+
 // errorInterceptor is a middleware that intercepts and handles the error returned by the next handler
 func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) error {
 		if err := next(c); err != nil {
-			if err == ErrUserNotFound {
+			if errors.Is(err, ErrUserNotFound) {
 				return c.Send(locale.Get(c.Sender().LanguageCode).StartMessage)
 			}
-			if err == fibapi.ErrAuthorizationExpired {
+			if errors.Is(err, fibapi.ErrAuthorizationExpired) {
 				log.Infof("user %d authorization has expired", c.Sender().ID)
 				if e := db.DelUser(c.Sender().ID); e != nil {
 					log.Errorf("failed to delete user %d: %v", c.Sender().ID, e)
 				}
 				return c.Send(&ErrorMessage{locale.Get(c.Sender().LanguageCode).FIBAPIAuthorizationExpiredMessage})
 			}
-			if err != ErrInternal {
+			if !errors.Is(err, ErrInternal) {
 				handlerName := runtime.FuncForPC(reflect.ValueOf(next).Pointer()).Name()
 				log.Errorf("error in handler %s: %v", handlerName, err)
 			}
@@ -155,7 +170,7 @@ func errorInterceptor(next tb.HandlerFunc) tb.HandlerFunc {
 
 // SendMessage sends the given message to a Telegram user with the given ID
 // it's meant to be called from outside the package
-func SendMessage(userID int64, message interface{}, opt ...interface{}) *tb.Message {
+func SendMessage(userID int64, message any, opt ...any) *tb.Message {
 	msg, err := b.Send(tb.ChatID(userID), message, append(opt, tb.NoPreview)...)
 	if err != nil {
 		log.Errorf("failed to send message to user %d: %s", userID, err)

@@ -6,7 +6,7 @@ var en = Locale{
 	StartMessage:                        "Please /login to authorize Racó Bot.",
 	LoginLinkMessage:                    `<a href="%s">Authorize Racó Bot with UPC SSO.</a>`,
 	GreetingMessage:                     "Hello, %s!",
-	HelpMessage:                         "You can use:\n/test to preview the latest one notice.\n/logout to stop receiving messages and revoke the authorization on server.\n\nFor bug reports (notices with malformed text, missing notices, error in translations, ...), feature requests, or any other inquiries, please use <i><a href=\"https://github.com/zry98/RacoBot/issues\">GitHub Issues</a></i>, thanks!",
+	HelpMessage:                         "You can use:\n/test to preview the latest notice.\n/logout to stop receiving messages and revoke the authorization on server.\n\nFor bug reports (notices with malformed text, missing notices, error in translations, ...), feature requests, or any other inquiries, please use <i><a href=\"https://github.com/zry98/RacoBot/issues\">GitHub Issues</a></i>, thanks!",
 	AlreadyLoggedInMessage:              "You are already logged-in, check /whoami; or /logout to revoke the authorization.",
 	LogoutSucceededMessage:              "You have successfully logged-out! And your FIB API token has been revoked on server, you can use /login to re-authorize.",
 	LogoutFailedMessage:                 `An error has occurred while logging you out. Although the bot has already deleted you from the database, you can revoke the token manually on <a href="https://api.fib.upc.edu/v2/o/authorized_tokens/">the FIB API Dashboard</a> if you want.`,
@@ -33,7 +33,7 @@ var en = Locale{
 		{Text: "lang", Description: "Select preferred language"},
 		{Text: "toggle_mute_banner_notices", Description: "Toggle mute banner notices"},
 		{Text: "whoami", Description: "Show personal information"},
-		{Text: "test", Description: "Show the latest one notice"},
+		{Text: "test", Description: "Show the latest notice"},
 		{Text: "logout", Description: "De-authorize bot"},
 	},
 }

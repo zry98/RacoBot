@@ -1,12 +1,13 @@
 package bot
 
 import (
+	"cmp"
 	"encoding/base64"
 	"fmt"
 	"html"
 	"net/url"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	hr "github.com/coolspring8/go-lolhtml" // HTMLRewriter
@@ -50,7 +51,7 @@ const (
 )
 
 var (
-	htmlCommentRegex = regexp.MustCompile(`<!--.*?-->`)
+	htmlCommentRegex = regexp.MustCompile(`(?s)<!--.*?-->`) // (?s) so `.` also matches newlines in multi-line comments
 	// HTML tags currently supported in Telegram API
 	supportedTagNames         = [...]string{"a", "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "code", "pre", "tg-spoiler"}
 	topLevelListItemPrefix    = `  • `
@@ -284,8 +285,8 @@ func (m *NoticeMessage) String() string {
 		if len(m.Attachments) > 1 {
 			noun = l.NoticeMessageAttachmentNounPlural
 			// sort attachments by filename
-			sort.Slice(m.Attachments, func(i, j int) bool {
-				return m.Attachments[i].Name < m.Attachments[j].Name
+			slices.SortFunc(m.Attachments, func(a, b fibapi.Attachment) int {
+				return cmp.Compare(a.Name, b.Name)
 			})
 		}
 
