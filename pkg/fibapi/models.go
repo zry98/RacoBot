@@ -29,7 +29,7 @@ type Notice struct {
 	CreatedAt   Time         `json:"data_insercio"`
 	ModifiedAt  Time         `json:"data_modificacio"`
 	ExpiresAt   Time         `json:"data_caducitat"`
-	PublishedAt Time         `json:"__published_at,omitempty"`
+	PublishedAt Time         `json:"__published_at"`
 	SubjectCode string       `json:"codi_assig"`
 	Title       string       `json:"titol"`
 	Text        string       `json:"text"`

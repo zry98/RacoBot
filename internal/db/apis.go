@@ -16,6 +16,7 @@ import (
 // key names
 const (
 	keySubjectCodes = "subject_codes"
+	keyUserIDs      = "user_ids"
 )
 
 // key name prefixes
@@ -106,43 +107,68 @@ func GetUser(userID int64) (User, error) {
 	return u, nil
 }
 
-// PutUser puts the given user
+// PutUser puts the given user and indexes its ID in the user IDs Set (atomically)
 func PutUser(user User) error {
 	key := fmt.Sprintf("%s:%d", keyPrefixUser, user.ID)
 	value, err := json.Marshal(user)
 	if err != nil {
 		return err
 	}
-	return rdb.Set(ctx, key, value, ttlUser).Err()
+	_, err = rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, key, value, ttlUser)
+		pipe.SAdd(ctx, keyUserIDs, user.ID)
+		return nil
+	})
+	return err
 }
 
-// DelUser deletes a user with the given ID
-// TODO: add userIDs to a set?
+// DelUser deletes a user with the given ID and removes it from the user IDs Set (atomically)
 func DelUser(userID int64) error {
 	key := fmt.Sprintf("%s:%d", keyPrefixUser, userID)
-	return rdb.Del(ctx, key).Err()
+	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Del(ctx, key)
+		pipe.SRem(ctx, keyUserIDs, userID)
+		return nil
+	})
+	return err
 }
 
-// GetAllUserIDs gets all user IDs
-// TODO: get userIDs from a set?
+// GetAllUserIDs gets all user IDs from the user IDs Set
 func GetAllUserIDs() ([]int64, error) {
-	keys, err := rdb.Keys(ctx, fmt.Sprintf("%s:*", keyPrefixUser)).Result()
+	values, err := rdb.SMembers(ctx, keyUserIDs).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			err = nil
-		}
 		return nil, err
 	}
-
-	userIDs := make([]int64, 0, len(keys))
-	for _, key := range keys {
-		ID, err := strconv.ParseInt(strings.TrimPrefix(key, keyPrefixUser+":"), 10, 64)
+	userIDs := make([]int64, 0, len(values))
+	for _, v := range values {
+		ID, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		userIDs = append(userIDs, ID)
 	}
 	return userIDs, nil
+}
+
+// reconcileUserIDIndex rebuilds the user IDs Set from the existing u:<id> keys.
+// It migrates deployments created before the index existed and self-heals any drift
+func reconcileUserIDIndex() error {
+	var ids []any
+	iter := rdb.Scan(ctx, 0, fmt.Sprintf("%s:*", keyPrefixUser), 100).Iterator()
+	for iter.Next(ctx) {
+		ID, err := strconv.ParseInt(strings.TrimPrefix(iter.Val(), keyPrefixUser+":"), 10, 64)
+		if err != nil {
+			return err
+		}
+		ids = append(ids, ID)
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return rdb.SAdd(ctx, keyUserIDs, ids...).Err()
 }
 
 // GetSubjectUPCCode gets the UPC code of a subject with the given acronym
@@ -170,7 +196,7 @@ func PutSubjectUPCCode(acronym string, code uint32) error {
 
 // PutSubjectUPCCodes puts the given subject UPC codes in bulk
 func PutSubjectUPCCodes(codes map[string]uint32) error {
-	values := make(map[string]interface{}, len(codes))
+	values := make(map[string]any, len(codes))
 	for acronym, code := range codes {
 		values[acronym] = strconv.FormatUint(uint64(code), 10)
 	}

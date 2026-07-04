@@ -1,6 +1,7 @@
 package job
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"RacoBot/internal/bot"
 	"RacoBot/internal/db"
 	"RacoBot/internal/locale"
+	"RacoBot/internal/metrics"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -53,7 +55,8 @@ func PushNewNotices() {
 		newNotices, err = client.GetNewNotices()
 		if err != nil {
 			userLogger.Errorf("failed to get new notices: %v", err)
-			if err == fibapi.ErrAuthorizationExpired {
+			metrics.IncFIBAPIErrors()
+			if errors.Is(err, fibapi.ErrAuthorizationExpired) {
 				// notify the user that their FIB API authorization has expired
 				if bot.SendMessage(userID, &bot.ErrorMessage{
 					Text: locale.Get(client.User.LanguageCode).FIBAPIAuthorizationExpiredMessage,
@@ -92,6 +95,9 @@ func PushNewNotices() {
 		checkedUserCount, len(userIDs),
 		totalSentCount, totalFetchedCount,
 		time.Since(start))
+
+	metrics.AddNoticesSent(int64(totalSentCount))
+	metrics.SetLastPush(time.Now())
 }
 
 // waitUntilSecond5 waits until the current time is at least 5 seconds into the minute
