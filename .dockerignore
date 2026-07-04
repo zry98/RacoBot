@@ -1,0 +1,14 @@
+.git
+.gitignore
+.github
+.idea
+README.md
+LICENSE
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+/RacoBot
+RacoBot
+config.toml
+*.log
