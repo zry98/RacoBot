@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -40,7 +41,7 @@ func login(c tb.Context) error {
 	}
 
 	user, err := db.GetUser(userID)
-	if err != nil && err != db.ErrUserNotFound {
+	if err != nil && !errors.Is(err, db.ErrUserNotFound) {
 		// db error
 		log.Errorf("failed to get user %d: %v", userID, err)
 		return ErrInternal
@@ -76,7 +77,7 @@ func login(c tb.Context) error {
 func whoami(c tb.Context) error {
 	fullName, err := NewClient(c.Sender().ID).GetFullName()
 	if err != nil {
-		if err == ErrUserNotFound || err == fibapi.ErrAuthorizationExpired {
+		if errors.Is(err, ErrUserNotFound) || errors.Is(err, fibapi.ErrAuthorizationExpired) {
 			return err
 		}
 		log.Errorf("failed to get full name of user %d: %v", c.Sender().ID, err)
@@ -93,7 +94,7 @@ func logout(c tb.Context) error {
 		return ErrUserNotFound
 	}
 	if err := client.Logout(); err != nil {
-		if err == fibapi.ErrAuthorizationExpired {
+		if errors.Is(err, fibapi.ErrAuthorizationExpired) {
 			return err
 		}
 		log.Errorf("failed to logout user %d: %v", c.Sender().ID, err)
@@ -120,7 +121,7 @@ func debug(c tb.Context) error {
 		return ErrUserNotFound
 	}
 	notice, err := client.GetNotice(int32(noticeID))
-	if err == fibapi.ErrNoticeNotFound || (err == nil && notice.ID == 0) {
+	if errors.Is(err, fibapi.ErrNoticeNotFound) || (err == nil && notice.ID == 0) {
 		// notice doesn't exist or isn't available to the user
 		return c.Send(&ErrorMessage{locale.Get(client.User.LanguageCode).NoticeUnavailableErrorMessage})
 	}
@@ -140,7 +141,7 @@ func test(c tb.Context) error {
 	}
 	notices, err := client.PrivateClient.GetNotices()
 	if err != nil {
-		if err == fibapi.ErrAuthorizationExpired {
+		if errors.Is(err, fibapi.ErrAuthorizationExpired) {
 			return err
 		}
 		log.Errorf("failed to get notices of user %d: %v", c.Sender().ID, err)
@@ -168,7 +169,7 @@ func test(c tb.Context) error {
 func setPreferredLanguage(c tb.Context) error {
 	user, err := db.GetUser(c.Sender().ID)
 	if err != nil {
-		if err == db.ErrUserNotFound {
+		if errors.Is(err, db.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		log.Errorf("failed to get user %d: %v", c.Sender().ID, err)
@@ -193,6 +194,8 @@ func setPreferredLanguage(c tb.Context) error {
 	return c.Edit(locale.Get(langCode).PreferredLanguageSetMessage)
 }
 
+const sendInterval = 50 * time.Millisecond // ~20 msg/s
+
 // publishAnnouncement publishes and pins the given announcement to all users in database
 // on command `/announce`
 func publishAnnouncement(c tb.Context) error {
@@ -212,7 +215,10 @@ func publishAnnouncement(c tb.Context) error {
 		logger.Infof("found %d users", len(userIDs))
 
 		startTime := time.Now()
-		for _, userID := range userIDs {
+		for i, userID := range userIDs {
+			if i > 0 {
+				time.Sleep(sendInterval)
+			}
 			if _, err = b.Send(tb.ChatID(userID), &announcement); err != nil {
 				logger.Errorf("failed to send announcement to user %d: %v", userID, err)
 				continue
@@ -231,7 +237,7 @@ func publishAnnouncement(c tb.Context) error {
 func toggleMuteBannerNotices(c tb.Context) error {
 	user, err := db.GetUser(c.Sender().ID)
 	if err != nil {
-		if err == db.ErrUserNotFound {
+		if errors.Is(err, db.ErrUserNotFound) {
 			return ErrUserNotFound
 		}
 		log.Errorf("failed to get user %d: %v", c.Sender().ID, err)

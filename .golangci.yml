@@ -1,0 +1,19 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      # writes to an http.ResponseWriter and deferred Close() calls have no actionable error to handle
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+  exclusions:
+    rules:
+      # explicit embedded-field selectors (e.g. c.User.ID, c.PrivateClient.X) are kept intentionally for readability
+      - linters: [staticcheck]
+        text: "QF1008"
+      # the status-code if/else chains read better than a tagged switch here (first branch matches multiple codes)
+      - linters: [staticcheck]
+        text: "QF1003"

@@ -180,7 +180,7 @@ func getNoticeLinkURL(n fibapi.Notice) string {
 
 	code, err := db.GetSubjectUPCCode(n.SubjectCode)
 	if err != nil {
-		if err == db.ErrSubjectNotFound {
+		if errors.Is(err, db.ErrSubjectNotFound) {
 			// not found in DB, try to get the code from FIB API
 			subject, e := fibapi.GetPublicSubject(n.SubjectCode)
 			if e != nil {

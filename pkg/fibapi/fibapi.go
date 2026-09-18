@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -116,7 +117,7 @@ func Authorize(authorizationCode string) (*oauth2.Token, UserInfo, error) {
 
 // ProcessTokenError returns a more specific error from the given error
 func ProcessTokenError(err error) error {
-	if rErr, ok := err.(*oauth2.RetrieveError); ok && rErr.Response.StatusCode == http.StatusBadRequest {
+	if rErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok && rErr.Response.StatusCode == http.StatusBadRequest {
 		var resp Response
 		if err = json.Unmarshal(rErr.Body, &resp); err != nil {
 			return fmt.Errorf("fibapi: error parsing response: %w", err)

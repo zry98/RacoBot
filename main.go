@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,8 +23,9 @@ import (
 )
 
 var (
-	config Config
-	srv    *http.Server
+	config      Config
+	srv         *http.Server
+	cleanupOnce sync.Once
 )
 
 func init() {
@@ -32,17 +35,19 @@ func init() {
 }
 
 func cleanup() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if srv != nil {
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Errorf("failed to shutdown HTTP server: %v", err)
+	cleanupOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if srv != nil {
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Errorf("failed to shutdown HTTP server: %v", err)
+			}
+			log.Debug("HTTP server shutdown")
 		}
-		log.Debug("HTTP server shutdown")
-	}
-	job.Stop()
-	bot.Stop()
-	db.Close()
+		job.Stop()
+		bot.Stop()
+		db.Close()
+	})
 }
 
 func main() {
@@ -54,22 +59,24 @@ func main() {
 	job.Init(config.JobsConfig)
 
 	shutdown := make(chan struct{})
-	go func() { // graceful shutdown
+	var shutdownOnce sync.Once
+	triggerShutdown := func() { shutdownOnce.Do(func() { close(shutdown) }) }
+
+	go func() { // trigger graceful shutdown on an interrupt/termination signal
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 		<-s
-		close(shutdown)
-		cleanup()
-		os.Exit(0)
+		triggerShutdown()
 	}()
 
 	r := http.NewServeMux()
-	r.HandleFunc(config.FIBAPIOAuthRedirectPath, internal.HandleOAuthRedirect) // FIB API OAuth redirect
-	if config.TelegramBotWebhookPath != "" {                                   // Telegram Bot update by webhook
-		r.HandleFunc(config.TelegramBotWebhookPath, internal.HandleBotUpdate)
+	r.HandleFunc("GET /healthz", internal.HandleHealthz)                              // health check
+	r.HandleFunc("GET "+config.FIBAPIOAuthRedirectPath, internal.HandleOAuthRedirect) // FIB API OAuth redirect
+	if config.TelegramBotWebhookPath != "" {                                          // Telegram Bot update by webhook
+		r.HandleFunc("POST "+config.TelegramBotWebhookPath, internal.HandleBotUpdate)
 	}
 	if config.MailtoLinkRedirectPath != "" { // mailto link redirect
-		r.HandleFunc(config.MailtoLinkRedirectPath, internal.HandleMailtoLinkRedirect)
+		r.HandleFunc("GET "+config.MailtoLinkRedirectPath, internal.HandleMailtoLinkRedirect)
 	}
 
 	srv = &http.Server{
@@ -89,16 +96,16 @@ func main() {
 			Certificates: config.TLS.Certificates,
 		}
 		go func() {
-			if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Errorf("failed to start HTTP server: %v", err)
-				shutdown <- struct{}{}
+				triggerShutdown()
 			}
 		}()
 	} else { // without TLS
 		go func() {
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Errorf("failed to start HTTP server: %v", err)
-				shutdown <- struct{}{}
+				triggerShutdown()
 			}
 		}()
 	}

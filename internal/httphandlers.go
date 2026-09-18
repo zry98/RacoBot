@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"RacoBot/internal/db"
 	rl "RacoBot/internal/db/ratelimiter"
 	"RacoBot/internal/locale"
+	"RacoBot/internal/metrics"
 	"RacoBot/pkg/fibapi"
 )
 
@@ -27,13 +29,27 @@ const (
 	//AuthorizedResponseBodyTemplate  = "<!DOCTYPE html><html lang=\"%s\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=tg://resolve?domain=%s\"><title>Racó Bot</title></head><body><h1>%s</h1><p>%s</p></body></html>\n"
 )
 
+// HandleHealthz handles a health check request which reports DB connectivity and runtime metrics
+func HandleHealthz(w http.ResponseWriter, r *http.Request) {
+	status, redisStatus, code := "ok", "ok", http.StatusOK
+	if err := db.Ping(r.Context()); err != nil {
+		status, redisStatus, code = "degraded", err.Error(), http.StatusServiceUnavailable
+	}
+
+	resp := struct {
+		Status string `json:"status"`
+		Redis  string `json:"redis"`
+		metrics.Snapshot
+	}{status, redisStatus, metrics.Get()}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 // HandleBotUpdate handles an incoming Telegram Bot Update request
 func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 	defer fmt.Fprintln(w)
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 
 	// check if request is legit from Telegram
 	if bot.WebhookSecretToken != "" && r.Header.Get(TelegramRequestTokenHeader) != bot.WebhookSecretToken {
@@ -93,12 +109,6 @@ func HandleBotUpdate(w http.ResponseWriter, r *http.Request) {
 
 // HandleOAuthRedirect handles an incoming FIB API OAuth redirect request
 func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
-		return
-	}
-
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 	if len(code) != fibapi.OAuthAuthorizationCodeLength || len(state) != db.OAuthStateHexEncodedLength {
@@ -117,7 +127,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	loginSession, err := db.GetLoginSession(state)
-	if err != nil && err != db.ErrLoginSessionNotFound {
+	if err != nil && !errors.Is(err, db.ErrLoginSessionNotFound) {
 		log.WithFields(log.Fields{
 			"IP":    r.RemoteAddr,
 			"state": state,
@@ -126,7 +136,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, InternalErrorResponseBody)
 		return
 	}
-	if err == db.ErrLoginSessionNotFound || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
+	if errors.Is(err, db.ErrLoginSessionNotFound) || loginSession.UserID == 0 || loginSession.LoginLinkMessageID == 0 {
 		log.WithFields(log.Fields{
 			"IP":    r.RemoteAddr,
 			"state": state,
@@ -144,7 +154,7 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 			"state": state,
 			"code":  code,
 		})
-		if err == fibapi.ErrInvalidAuthorizationCode {
+		if errors.Is(err, fibapi.ErrInvalidAuthorizationCode) {
 			logger.Info("invalid OAuth redirect request: invalid authorization code")
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintln(w, InvalidOAuthRequestResponseBody)
@@ -197,10 +207,6 @@ func HandleOAuthRedirect(w http.ResponseWriter, r *http.Request) {
 // HandleMailtoLinkRedirect handles an incoming mailto: link redirect request
 func HandleMailtoLinkRedirect(w http.ResponseWriter, r *http.Request) {
 	defer fmt.Fprintln(w)
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 
 	payload := r.URL.Query().Get("payload")
 	if payload == "" {

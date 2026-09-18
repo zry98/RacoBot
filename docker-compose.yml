@@ -1,0 +1,28 @@
+services:
+  db:
+    # use `redis:7-alpine` (and redis-cli below) if you prefer Redis
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: [ 'valkey-server', '--appendonly', 'yes', '--save', '60', '1' ]
+    volumes:
+      - db-data:/data
+    healthcheck:
+      test: [ 'CMD', 'valkey-cli', 'ping' ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  racobot:
+    build: .
+    image: racobot:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+
+volumes:
+  db-data:

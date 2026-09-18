@@ -1,13 +1,15 @@
 package fibapi
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,15 +78,13 @@ func (c *PrivateClient) GetNoticesSince(timestamp int64) ([]Notice, error) {
 			ns = append(ns, n)
 		}
 	}
-	sort.Slice(ns, func(i, j int) bool {
-		// sort orders: PublishedAt, SubjectCode, Title
-		if ns[i].PublishedAt.Unix() == ns[j].PublishedAt.Unix() {
-			if ns[i].SubjectCode == ns[j].SubjectCode {
-				return ns[i].Title < ns[j].Title // in line with raco web
-			}
-			return ns[i].SubjectCode < ns[j].SubjectCode
-		}
-		return ns[i].PublishedAt.Unix() < ns[j].PublishedAt.Unix()
+	// sort orders: PublishedAt, SubjectCode, Title (in line with raco web)
+	slices.SortFunc(ns, func(a, b Notice) int {
+		return cmp.Or(
+			cmp.Compare(a.PublishedAt.Unix(), b.PublishedAt.Unix()),
+			cmp.Compare(a.SubjectCode, b.SubjectCode),
+			cmp.Compare(a.Title, b.Title),
+		)
 	})
 	return ns, nil
 }
@@ -154,7 +154,7 @@ func (c *PrivateClient) request(method, URL string) ([]byte, http.Header, error)
 	var body []byte
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		if rErr, ok := err.(*url.Error).Err.(*oauth2.RetrieveError); ok { // API error, pass it to later handling
+		if rErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok { // API error, pass it to later handling
 			resp = rErr.Response
 			body = rErr.Body
 		} else {

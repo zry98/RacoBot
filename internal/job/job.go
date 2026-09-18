@@ -3,7 +3,7 @@ package job
 import (
 	"time"
 
-	"github.com/go-co-op/gocron"
+	"github.com/go-co-op/gocron/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -13,7 +13,7 @@ type Config struct {
 	CacheSubjectCodesCronExp string `toml:"cache_subject_codes_cron"`
 }
 
-var scheduler *gocron.Scheduler
+var scheduler gocron.Scheduler
 
 // Init initializes the jobs scheduler
 func Init(config Config) {
@@ -22,16 +22,23 @@ func Init(config Config) {
 		panic(err)
 	}
 
-	scheduler = gocron.NewScheduler(tzMadrid)
-	scheduler.SetMaxConcurrentJobs(1, gocron.RescheduleMode)
+	scheduler, err = gocron.NewScheduler(
+		gocron.WithLocation(tzMadrid),
+		gocron.WithLimitConcurrentJobs(1, gocron.LimitModeReschedule),
+	)
+	if err != nil {
+		log.Fatalf("failed to create jobs scheduler: %v", err)
+	}
 	addJobs(config)
-	scheduler.StartAsync()
+	scheduler.Start()
 }
 
 // Stop stops the jobs scheduler
 func Stop() {
 	if scheduler != nil {
-		scheduler.Stop()
+		if err := scheduler.Shutdown(); err != nil {
+			log.Errorf("failed to shutdown jobs scheduler: %v", err)
+		}
 	}
 	log.Debug("jobs scheduler stopped")
 }
@@ -39,14 +46,20 @@ func Stop() {
 // addJobs adds the jobs to the scheduler
 func addJobs(config Config) {
 	if config.PushNewNoticesCronExp != "" {
-		_, err := scheduler.Cron(config.PushNewNoticesCronExp).Tag("PushNewNotices").Do(PushNewNotices)
-		if err != nil {
+		if _, err := scheduler.NewJob(
+			gocron.CronJob(config.PushNewNoticesCronExp, false),
+			gocron.NewTask(PushNewNotices),
+			gocron.WithName("PushNewNotices"),
+		); err != nil {
 			log.Errorf("failed to schedule PushNewNotices: %v", err)
 		}
 	}
 	if config.CacheSubjectCodesCronExp != "" {
-		_, err := scheduler.Cron(config.CacheSubjectCodesCronExp).Tag("CacheSubjectCodes").Do(CacheSubjectCodes)
-		if err != nil {
+		if _, err := scheduler.NewJob(
+			gocron.CronJob(config.CacheSubjectCodesCronExp, false),
+			gocron.NewTask(CacheSubjectCodes),
+			gocron.WithName("CacheSubjectCodes"),
+		); err != nil {
 			log.Errorf("failed to schedule CacheSubjectCodes: %v", err)
 		}
 	}
